@@ -1,8 +1,8 @@
 <?php
-// ket noi sqlite
+// connect sqlite
 $db = new PDO('sqlite:' . __DIR__ . '/memo.sqlite');
 
-// tao bang neu chua co
+// create table if not exists
 $db->exec("CREATE TABLE IF NOT EXISTS memos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -10,14 +10,13 @@ $db->exec("CREATE TABLE IF NOT EXISTS memos (
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 )");
 
-// xu ly form khi bam nut
+// handle form on submit
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $action = $_POST['action'];
 
     if ($action == 'add') {
         $title = trim($_POST['title']);
         $content = trim($_POST['content']);
-
         if ($title != '') {
             $stmt = $db->prepare("INSERT INTO memos (title, content) VALUES (?, ?)");
             $stmt->execute([$title, $content]);
@@ -28,7 +27,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $id = $_POST['id'];
         $title = trim($_POST['title']);
         $content = trim($_POST['content']);
-
         if ($title != '') {
             $stmt = $db->prepare("UPDATE memos SET title = ?, content = ? WHERE id = ?");
             $stmt->execute([$title, $content, $id]);
@@ -41,15 +39,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->execute([$id]);
     }
 
-    // load lai trang cho khoi gui form 2 lan
+    // reload page so the form is not sent twice
     header('Location: index.php');
     exit;
 }
 
-// lay danh sach memo
+// get all memos
 $memos = $db->query("SELECT * FROM memos ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
 
-// neu dang sua thi lay memo can sua
+// if editing, load that memo
 $edit = null;
 if (isset($_GET['edit'])) {
     $stmt = $db->prepare("SELECT * FROM memos WHERE id = ?");
@@ -58,91 +56,157 @@ if (isset($_GET['edit'])) {
 }
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Memo App</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 20px;
+            background: #f4f5f7;
+            color: #333;
+            margin: 0;
+            padding: 30px 15px;
         }
 
-        input, textarea, button {
-            font-size: 14px;
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            margin-top: 0;
+        }
+
+        h3 {
+            margin: 0 0 12px;
+        }
+
+        .box {
+            background: #fff;
+            border: 1px solid #e3e3e3;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
         }
 
         input, textarea {
-            width: 300px;
-            display: block;
-            margin-bottom: 8px;
-            padding: 5px;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 9px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+            font-family: inherit;
         }
 
         textarea {
-            height: 80px;
+            height: 90px;
+            resize: vertical;
         }
 
-        .memo {
-            border: 1px solid #ccc;
-            padding: 10px;
-            margin-bottom: 10px;
+        button {
+            padding: 8px 14px;
+            border: 0;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .btn {
+            background: #2d6cdf;
+            color: #fff;
+        }
+
+        .btn:hover {
+            background: #2559bd;
+        }
+
+        .btn-gray {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-gray:hover {
+            background: #d2d2d2;
         }
 
         .date {
-            color: gray;
+            color: #999;
             font-size: 12px;
-            margin-bottom: 8px;
+            margin: 8px 0 12px;
         }
 
-        .inline-form {
-            display: inline;
+        a.link {
+            color: #2d6cdf;
+            text-decoration: none;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+
+        a.link:hover {
+            text-decoration: underline;
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
     </style>
 </head>
 <body>
+<div class="container">
 
-<h1>Memo App</h1>
+    <h1>Memo App</h1>
 
-<form method="post">
-    <?php if ($edit) { ?>
-        <h3>Sua memo</h3>
-        <input type="hidden" name="action" value="edit">
-        <input type="hidden" name="id" value="<?php echo $edit['id']; ?>">
-        <input type="text" name="title" value="<?php echo htmlspecialchars($edit['title']); ?>" placeholder="Tieu de">
-        <textarea name="content" placeholder="Noi dung"><?php echo htmlspecialchars($edit['content']); ?></textarea>
-        <button type="submit">Cap nhat</button>
-        <a href="index.php">Huy</a>
-    <?php } else { ?>
-        <h3>Them memo moi</h3>
-        <input type="hidden" name="action" value="add">
-        <input type="text" name="title" placeholder="Tieu de">
-        <textarea name="content" placeholder="Noi dung"></textarea>
-        <button type="submit">Luu</button>
-    <?php } ?>
-</form>
-
-<hr>
-
-<?php if (count($memos) == 0) { ?>
-    <p>Chua co memo nao.</p>
-<?php } ?>
-
-<?php foreach ($memos as $memo) { ?>
-    <div class="memo">
-        <h3><?php echo htmlspecialchars($memo['title']); ?></h3>
-        <p><?php echo nl2br(htmlspecialchars($memo['content'])); ?></p>
-        <div class="date"><?php echo $memo['created_at']; ?></div>
-
-        <a href="index.php?edit=<?php echo $memo['id']; ?>">Sua</a>
-
-        <form method="post" class="inline-form" onsubmit="return confirm('Xoa memo nay?')">
-            <input type="hidden" name="action" value="delete">
-            <input type="hidden" name="id" value="<?php echo $memo['id']; ?>">
-            <button type="submit">Xoa</button>
+    <!-- add / edit form -->
+    <div class="box">
+        <form method="post">
+            <?php if ($edit) { ?>
+                <h3>Edit memo</h3>
+                <input type="hidden" name="action" value="edit">
+                <input type="hidden" name="id" value="<?php echo $edit['id']; ?>">
+                <input type="text" name="title" value="<?php echo htmlspecialchars($edit['title']); ?>" placeholder="Title">
+                <textarea name="content" placeholder="Content"><?php echo htmlspecialchars($edit['content']); ?></textarea>
+                <div class="actions">
+                    <button type="submit" class="btn">Update</button>
+                    <a class="link" href="index.php">Cancel</a>
+                </div>
+            <?php } else { ?>
+                <h3>Add new memo</h3>
+                <input type="hidden" name="action" value="add">
+                <input type="text" name="title" placeholder="Title">
+                <textarea name="content" placeholder="Content"></textarea>
+                <button type="submit" class="btn">Save</button>
+            <?php } ?>
         </form>
     </div>
-<?php } ?>
 
+    <!-- memo list -->
+    <?php if (count($memos) == 0) { ?>
+        <div class="box">No memos yet.</div>
+    <?php } ?>
+
+    <?php foreach ($memos as $memo) { ?>
+        <div class="box">
+            <h3><?php echo htmlspecialchars($memo['title']); ?></h3>
+            <p><?php echo nl2br(htmlspecialchars($memo['content'])); ?></p>
+            <div class="date"><?php echo $memo['created_at']; ?></div>
+
+            <div class="actions">
+                <a class="link" href="index.php?edit=<?php echo $memo['id']; ?>">Edit</a>
+                <form method="post" onsubmit="return confirm('Delete this memo?')">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="id" value="<?php echo $memo['id']; ?>">
+                    <button type="submit" class="btn-gray">Delete</button>
+                </form>
+            </div>
+        </div>
+    <?php } ?>
+
+</div>
 </body>
 </html>
