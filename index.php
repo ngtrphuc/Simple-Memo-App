@@ -1,58 +1,46 @@
 <?php
-// connect sqlite
-$db = new PDO('sqlite:' . __DIR__ . '/memo.sqlite');
+require 'db.php';
 
-// create table if not exists
-$db->exec("CREATE TABLE IF NOT EXISTS memos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    content TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-)");
+if (!isset($_SESSION['user_id'])) {
+    header('Location: auth.php');
+    exit;
+}
 
-// handle form on submit
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $action = $_POST['action'];
+$userId = $_SESSION['user_id'];
 
-    if ($action == 'add') {
-        $title = trim($_POST['title']);
-        $content = trim($_POST['content']);
-        if ($title != '') {
-            $stmt = $db->prepare("INSERT INTO memos (title, content) VALUES (?, ?)");
-            $stmt->execute([$title, $content]);
-        }
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+    $title = trim($_POST['title'] ?? '');
+    $content = trim($_POST['content'] ?? '');
+
+    if ($action === 'add' && $title !== '') {
+        $stmt = $db->prepare("INSERT INTO memos (user_id, title, content) VALUES (?, ?, ?)");
+        $stmt->execute([$userId, $title, $content]);
     }
 
-    if ($action == 'edit') {
-        $id = $_POST['id'];
-        $title = trim($_POST['title']);
-        $content = trim($_POST['content']);
-        if ($title != '') {
-            $stmt = $db->prepare("UPDATE memos SET title = ?, content = ? WHERE id = ?");
-            $stmt->execute([$title, $content, $id]);
-        }
+    if ($action === 'edit' && $title !== '') {
+        $stmt = $db->prepare("UPDATE memos SET title = ?, content = ? WHERE id = ? AND user_id = ?");
+        $stmt->execute([$title, $content, $_POST['id'], $userId]);
     }
 
-    if ($action == 'delete') {
-        $id = $_POST['id'];
-        $stmt = $db->prepare("DELETE FROM memos WHERE id = ?");
-        $stmt->execute([$id]);
+    if ($action === 'delete') {
+        $stmt = $db->prepare("DELETE FROM memos WHERE id = ? AND user_id = ?");
+        $stmt->execute([$_POST['id'], $userId]);
     }
 
-    // reload page so the form is not sent twice
     header('Location: index.php');
     exit;
 }
 
-// get all memos
-$memos = $db->query("SELECT * FROM memos ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+$stmt = $db->prepare("SELECT * FROM memos WHERE user_id = ? ORDER BY id DESC");
+$stmt->execute([$userId]);
+$memos = $stmt->fetchAll();
 
-// if editing, load that memo
 $edit = null;
 if (isset($_GET['edit'])) {
-    $stmt = $db->prepare("SELECT * FROM memos WHERE id = ?");
-    $stmt->execute([$_GET['edit']]);
-    $edit = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt = $db->prepare("SELECT * FROM memos WHERE id = ? AND user_id = ?");
+    $stmt->execute([$_GET['edit'], $userId]);
+    $edit = $stmt->fetch();
 }
 ?>
 <!DOCTYPE html>
@@ -71,12 +59,20 @@ if (isset($_GET['edit'])) {
         }
 
         .container {
-            max-width: 600px;
+            max-width: 640px;
             margin: 0 auto;
         }
 
+        .top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
         h1 {
-            margin-top: 0;
+            margin: 0;
         }
 
         h3 {
@@ -120,17 +116,15 @@ if (isset($_GET['edit'])) {
             color: #fff;
         }
 
-        .btn:hover {
-            background: #2559bd;
-        }
-
         .btn-gray {
             background: #e0e0e0;
             color: #333;
         }
 
-        .btn-gray:hover {
-            background: #d2d2d2;
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .date {
@@ -139,30 +133,27 @@ if (isset($_GET['edit'])) {
             margin: 8px 0 12px;
         }
 
-        a.link {
+        .link {
             color: #2d6cdf;
             text-decoration: none;
-            font-size: 14px;
             margin-right: 10px;
         }
 
-        a.link:hover {
-            text-decoration: underline;
-        }
-
-        .actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        .hello {
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
 <div class="container">
+    <div class="top">
+        <h1>Memo App</h1>
+        <div class="hello">
+            Hello, <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong>
+            <a class="link" href="auth.php?action=logout">Logout</a>
+        </div>
+    </div>
 
-    <h1>Memo App</h1>
-
-    <!-- add / edit form -->
     <div class="box">
         <form method="post">
             <?php if ($edit) { ?>
@@ -185,8 +176,7 @@ if (isset($_GET['edit'])) {
         </form>
     </div>
 
-    <!-- memo list -->
-    <?php if (count($memos) == 0) { ?>
+    <?php if (!$memos) { ?>
         <div class="box">No memos yet.</div>
     <?php } ?>
 
@@ -195,7 +185,6 @@ if (isset($_GET['edit'])) {
             <h3><?php echo htmlspecialchars($memo['title']); ?></h3>
             <p><?php echo nl2br(htmlspecialchars($memo['content'])); ?></p>
             <div class="date"><?php echo $memo['created_at']; ?></div>
-
             <div class="actions">
                 <a class="link" href="index.php?edit=<?php echo $memo['id']; ?>">Edit</a>
                 <form method="post" onsubmit="return confirm('Delete this memo?')">
@@ -206,7 +195,6 @@ if (isset($_GET['edit'])) {
             </div>
         </div>
     <?php } ?>
-
 </div>
 </body>
 </html>
