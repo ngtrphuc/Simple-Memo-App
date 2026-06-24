@@ -41,6 +41,8 @@ You can also run the same server directly with:
 php -S 127.0.0.1:32123
 ```
 
+On Windows, you can also double-click `run-web.bat`.
+
 ## Run as a desktop app
 
 Install Electron once:
@@ -56,6 +58,8 @@ npm start
 ```
 
 This project includes a small launcher script that clears `ELECTRON_RUN_AS_NODE` before opening Electron. That helps on Windows setups where that environment variable is already set in the shell.
+
+On Windows, you can also double-click `run-app.bat`.
 
 ## Sync behavior
 
