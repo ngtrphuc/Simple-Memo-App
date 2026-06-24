@@ -8,7 +8,7 @@ This project stays as a normal PHP web app, and now also has a very simple Elect
 - Electron only opens a desktop window that points to `http://127.0.0.1:32123/auth.php`.
 - If no PHP server is running, Electron starts one for you.
 - If you already started `php -S 127.0.0.1:32123`, Electron reuses that server instead of starting a second copy.
-- Web and app use the same `memo.sqlite`, so they stay in sync automatically.
+- Web and app use one shared database file at `E:\Code\PHP\MemoApp-Shared\memo.sqlite`, so they stay in sync automatically even if the web repo and Electron app live in different sibling folders under `E:\Code\PHP`.
 
 ## Requirements
 
@@ -70,5 +70,7 @@ On Windows, you can also double-click `run-app.bat`.
 ## Notes
 
 - `memo.sqlite` is ignored by git because it is your local data.
+- The live shared database is `E:\Code\PHP\MemoApp-Shared\memo.sqlite`.
+- The `memo.sqlite` file inside each app folder is now only a local leftover or backup source. The app no longer reads from it by default.
 - The logout flow now clears the session more cleanly.
 - New memos now store `created_at` using `Asia/Tokyo` time instead of SQLite UTC.

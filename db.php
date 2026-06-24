@@ -2,7 +2,14 @@
 session_start();
 date_default_timezone_set('Asia/Tokyo');
 
-$db = new PDO('sqlite:' . __DIR__ . '/memo.sqlite');
+$sharedDataDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'MemoApp-Shared';
+$databasePath = getenv('MEMO_DB_PATH') ?: $sharedDataDir . DIRECTORY_SEPARATOR . 'memo.sqlite';
+
+if (!is_dir(dirname($databasePath))) {
+    mkdir(dirname($databasePath), 0777, true);
+}
+
+$db = new PDO('sqlite:' . $databasePath);
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
