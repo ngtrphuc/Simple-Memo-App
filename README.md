@@ -1,84 +1,70 @@
 # Simple Memo App
 
-This project can still run as a normal PHP app, but it now also includes everything needed to build a real Windows desktop app with PHP Desktop.
+This project stays as a normal PHP web app, and now also has a very simple Electron wrapper for running it like a local desktop app.
 
-## What changed
+## How it works
 
-- The `Delete` button no longer uses `confirm()`, which is unreliable in PHP Desktop.
-- `settings.json` now uses the correct schema for PHP Desktop Chrome `130.1`.
-- The project includes a reproducible build script that downloads the official PHP Desktop runtime and assembles the desktop app automatically.
-- All project text has been converted to English.
+- The PHP code is still the real app.
+- Electron only opens a desktop window that points to `http://127.0.0.1:32123/auth.php`.
+- If no PHP server is running, Electron starts one for you.
+- If you already started `php -S 127.0.0.1:32123`, Electron reuses that server instead of starting a second copy.
+- Web and app use the same `memo.sqlite`, so they stay in sync automatically.
 
-## Run as a local PHP app
+## Requirements
 
-Open a terminal in the project folder and run:
+- PHP installed and available in `PATH`
+- Node.js and npm installed
+
+Check them with:
 
 ```bash
-php -S 127.0.0.1:8000
+php -v
+node -v
+npm -v
+```
+
+## Run as a web app
+
+```bash
+npm run web
 ```
 
 Then open:
 
 ```text
-http://127.0.0.1:8000/auth.php
+http://127.0.0.1:32123/auth.php
 ```
 
-## Build the Windows desktop app
+You can also run the same server directly with:
 
-Run:
-
-```powershell
-.\build-desktop.ps1
+```bash
+php -S 127.0.0.1:32123
 ```
 
-Or, if you want the absolute smallest package and are willing to risk a blank window on some PCs, run:
+## Run as a desktop app
 
-```powershell
-.\build-desktop.ps1 -RemoveOptionalGpuFiles
+Install Electron once:
+
+```bash
+npm install
 ```
 
-The script will:
+Then start the app:
 
-- Download the latest official Windows PHP Desktop release if it is missing
-- Extract the runtime
-- Copy this app into the runtime `www` folder
-- Copy the current `memo.sqlite` database if it exists
-- Rename the launcher to `MemoApp.exe`
-- Slim the PHP runtime down to only the SQLite-related files this app actually uses
-- Keep only `en-US.pak` plus the locale selected in `settings.json`
-- Create a distributable zip file
-
-## Build output
-
-After the script finishes, the generated files will be here:
-
-- `dist\MemoApp-Desktop\`
-- `dist\MemoApp-Desktop.zip`
-
-Run the desktop app by opening:
-
-```text
-dist\MemoApp-Desktop\MemoApp.exe
+```bash
+npm start
 ```
 
-If you already have a built app folder and want to slim it in place, put [cleanup.bat](/E:/Code/PHP/Simple-Memo-App/cleanup.bat) next to `MemoApp.exe` and run it there.
+This project includes a small launcher script that clears `ELECTRON_RUN_AS_NODE` before opening Electron. That helps on Windows setups where that environment variable is already set in the shell.
+
+## Sync behavior
+
+- If the Electron app is open, you can also open the browser at `http://127.0.0.1:32123/auth.php`.
+- Both screens read and write the same `memo.sqlite`.
+- There is no extra sync code because both sides use the same PHP app and the same database file.
 
 ## Notes
 
-- The database file is stored inside the packaged app at `www\memo.sqlite`.
-- Keep the app in a normal writable folder such as `D:\MemoApp` or your Desktop.
-- If Windows reports missing runtime DLLs, install Microsoft Visual C++ Redistributable 2015-2022 x64.
-- The `php\` folder only needs these files for this project:
-
-```text
-php\
-|-- php-cgi.exe
-|-- php8.dll
-|-- php.ini
-|-- libsqlite3.dll
-\-- ext\
-    |-- php_pdo_sqlite.dll
-    \-- php_sqlite3.dll
-```
-
-- Do not aggressively delete the top-level Chromium / CEF files such as `libcef.dll`, `resources.pak`, `icudtl.dat`, `libEGL.dll`, `libGLESv2.dll`, `snapshot_blob.bin`, `v8_context_snapshot.bin`, or `chrome_*.pak`. Those are part of the browser engine and are required for the desktop window to open.
+- `memo.sqlite` is ignored by git because it is your local data.
+- The logout flow now clears the session more cleanly.
+- New memos now store `created_at` using `Asia/Tokyo` time instead of SQLite UTC.

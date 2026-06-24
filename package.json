@@ -1,0 +1,16 @@
+{
+  "name": "simple-memo-app",
+  "version": "1.0.0",
+  "description": "Simple PHP memo app that can also run inside Electron.",
+  "main": "main.js",
+  "scripts": {
+    "start": "node start-electron.js",
+    "web": "php -S 127.0.0.1:32123"
+  },
+  "devDependencies": {
+    "electron": "^42.5.0"
+  },
+  "allowScripts": {
+    "electron@42.5.0": true
+  }
+}

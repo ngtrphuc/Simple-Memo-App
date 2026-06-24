@@ -1,5 +1,6 @@
 <?php
 session_start();
+date_default_timezone_set('Asia/Tokyo');
 
 $db = new PDO('sqlite:' . __DIR__ . '/memo.sqlite');
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);

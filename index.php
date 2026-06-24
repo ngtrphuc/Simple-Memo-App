@@ -14,8 +14,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $content = trim($_POST['content'] ?? '');
 
     if ($action === 'add' && $title !== '') {
-        $stmt = $db->prepare("INSERT INTO memos (user_id, title, content) VALUES (?, ?, ?)");
-        $stmt->execute([$userId, $title, $content]);
+        $stmt = $db->prepare("INSERT INTO memos (user_id, title, content, created_at) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$userId, $title, $content, date('Y-m-d H:i:s')]);
     }
 
     if ($action === 'edit' && $title !== '') {
