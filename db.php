@@ -2,8 +2,7 @@
 session_start();
 date_default_timezone_set('Asia/Tokyo');
 
-$sharedDataDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'MemoApp-Shared';
-$databasePath = getenv('MEMO_DB_PATH') ?: $sharedDataDir . DIRECTORY_SEPARATOR . 'memo.sqlite';
+$databasePath = getenv('MEMO_DB_PATH') ?: __DIR__ . DIRECTORY_SEPARATOR . 'memo.sqlite';
 
 if (!is_dir(dirname($databasePath))) {
     mkdir(dirname($databasePath), 0777, true);
