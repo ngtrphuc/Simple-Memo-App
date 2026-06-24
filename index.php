@@ -187,14 +187,23 @@ if (isset($_GET['edit'])) {
             <div class="date"><?php echo $memo['created_at']; ?></div>
             <div class="actions">
                 <a class="link" href="index.php?edit=<?php echo $memo['id']; ?>">Edit</a>
-                <form method="post" onsubmit="return confirm('Delete this memo?')">
+                <form method="post">
                     <input type="hidden" name="action" value="delete">
                     <input type="hidden" name="id" value="<?php echo $memo['id']; ?>">
-                    <button type="submit" class="btn-gray">Delete</button>
+                    <button type="button" class="btn-gray" onclick="confirmDelete(this)">Delete</button>
                 </form>
             </div>
         </div>
     <?php } ?>
 </div>
+<script>
+function confirmDelete(button) {
+    if (button.innerText === 'Delete') {
+        button.innerText = 'Sure?';
+    } else {
+        button.form.submit();
+    }
+}
+</script>
 </body>
 </html>
