@@ -12,15 +12,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $title = trim($_POST['title'] ?? '');
     $content = trim($_POST['content'] ?? '');
+    $remind = trim($_POST['remind_at'] ?? '');
 
     if ($action === 'add' && $title !== '') {
-        $stmt = $db->prepare("INSERT INTO memos (user_id, title, content, created_at) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$userId, $title, $content, date('Y-m-d H:i:s')]);
+        $stmt = $db->prepare("INSERT INTO memos (user_id, title, content, remind_at, created_at) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([$userId, $title, $content, $remind, date('Y-m-d H:i:s')]);
     }
 
     if ($action === 'edit' && $title !== '') {
-        $stmt = $db->prepare("UPDATE memos SET title = ?, content = ? WHERE id = ? AND user_id = ?");
-        $stmt->execute([$title, $content, $_POST['id'], $userId]);
+        $stmt = $db->prepare("UPDATE memos SET title = ?, content = ?, remind_at = ? WHERE id = ? AND user_id = ?");
+        $stmt->execute([$title, $content, $remind, $_POST['id'], $userId]);
     }
 
     if ($action === 'delete') {
@@ -142,6 +143,19 @@ if (isset($_GET['edit'])) {
         .hello {
             font-size: 14px;
         }
+
+        .lbl {
+            display: block;
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .remind {
+            color: #d9822b;
+            font-size: 13px;
+            margin: 8px 0;
+        }
     </style>
 </head>
 <body>
@@ -162,6 +176,8 @@ if (isset($_GET['edit'])) {
                 <input type="hidden" name="id" value="<?php echo $edit['id']; ?>">
                 <input type="text" name="title" value="<?php echo htmlspecialchars($edit['title']); ?>" placeholder="Title">
                 <textarea name="content" placeholder="Content"><?php echo htmlspecialchars($edit['content']); ?></textarea>
+                <label class="lbl">Remind me at (optional)</label>
+                <input type="datetime-local" name="remind_at" value="<?php echo htmlspecialchars($edit['remind_at'] ?? ''); ?>">
                 <div class="actions">
                     <button type="submit" class="btn">Update</button>
                     <a class="link" href="index.php">Cancel</a>
@@ -171,6 +187,8 @@ if (isset($_GET['edit'])) {
                 <input type="hidden" name="action" value="add">
                 <input type="text" name="title" placeholder="Title">
                 <textarea name="content" placeholder="Content"></textarea>
+                <label class="lbl">Remind me at (optional)</label>
+                <input type="datetime-local" name="remind_at">
                 <button type="submit" class="btn">Save</button>
             <?php } ?>
         </form>
@@ -184,6 +202,11 @@ if (isset($_GET['edit'])) {
         <div class="box">
             <h3><?php echo htmlspecialchars($memo['title']); ?></h3>
             <p><?php echo nl2br(htmlspecialchars($memo['content'])); ?></p>
+            <?php if (!empty($memo['remind_at'])) { ?>
+                <div class="remind" data-remind="<?php echo htmlspecialchars($memo['remind_at']); ?>" data-title="<?php echo htmlspecialchars($memo['title']); ?>">
+                    &#9200; <?php echo str_replace('T', ' ', $memo['remind_at']); ?>
+                </div>
+            <?php } ?>
             <div class="date"><?php echo $memo['created_at']; ?></div>
             <div class="actions">
                 <a class="link" href="index.php?edit=<?php echo $memo['id']; ?>">Edit</a>
@@ -204,6 +227,41 @@ function confirmDelete(button) {
         button.form.submit();
     }
 }
+
+if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+}
+
+var alreadyNotified = [];
+
+function checkReminders() {
+    var now = new Date();
+    var items = document.querySelectorAll('.remind');
+
+    items.forEach(function (item) {
+        var remindAt = item.getAttribute('data-remind');
+        var title = item.getAttribute('data-title');
+
+        if (!remindAt) {
+            return;
+        }
+
+        var remindTime = new Date(remindAt);
+
+        if (now >= remindTime && alreadyNotified.indexOf(remindAt + title) === -1) {
+            alreadyNotified.push(remindAt + title);
+
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Memo reminder', { body: title });
+            } else {
+                alert('Reminder: ' + title);
+            }
+        }
+    });
+}
+
+setInterval(checkReminders, 10000);
+checkReminders();
 </script>
 </body>
 </html>

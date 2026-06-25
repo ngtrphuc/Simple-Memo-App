@@ -6,6 +6,7 @@ Simple Memo App is a small PHP note-taking app with user login, SQLite storage, 
 
 - User registration and login
 - Create, edit, and delete personal memos
+- Optional memo reminders while the app is open
 - SQLite-based local data storage
 - Run in a browser or as a lightweight Electron desktop app
 

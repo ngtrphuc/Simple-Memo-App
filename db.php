@@ -23,19 +23,27 @@ $db->exec("CREATE TABLE IF NOT EXISTS memos (
     user_id INTEGER,
     title TEXT,
     content TEXT,
+    remind_at TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 )");
 
 $columns = $db->query("PRAGMA table_info(memos)")->fetchAll();
 $hasUserId = false;
+$hasRemindAt = false;
 
 foreach ($columns as $column) {
     if ($column['name'] === 'user_id') {
         $hasUserId = true;
-        break;
+    }
+    if ($column['name'] === 'remind_at') {
+        $hasRemindAt = true;
     }
 }
 
 if (!$hasUserId) {
     $db->exec("ALTER TABLE memos ADD COLUMN user_id INTEGER");
+}
+
+if (!$hasRemindAt) {
+    $db->exec("ALTER TABLE memos ADD COLUMN remind_at TEXT");
 }

@@ -1,4 +1,5 @@
 memo.sqlite
+memo.sqlite-*
 dist
 node_modules
-backup
+
