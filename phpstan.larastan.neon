@@ -1,0 +1,21 @@
+# Laravel/Larastan config.
+# Use this when the project has a standard Laravel bootstrap file at bootstrap/app.php.
+
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app/
+        # - tests/   # enable later
+
+    # Level 0-10 (10 is strictest). Start low for older code, then raise later.
+    level: 3
+
+    # Add framework / magic false positives here when needed.
+    ignoreErrors:
+        # - '#Call to an undefined method .*#'
+
+    excludePaths:
+        analyseAndScan:
+            - app/Legacy/ThatOneCursedFile.php (?)

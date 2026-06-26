@@ -32,14 +32,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($username === '' || $password === '') {
         $error = 'Please fill in all fields.';
     } elseif ($action === 'register') {
-        $stmt = $db->prepare("SELECT id FROM users WHERE username = ?");
+        $stmt = $db->prepare('SELECT id FROM users WHERE username = ?');
         $stmt->execute([$username]);
 
         if ($stmt->fetch()) {
             $error = 'Username already exists.';
         } else {
             $hash = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $db->prepare("INSERT INTO users (username, password) VALUES (?, ?)");
+            $stmt = $db->prepare('INSERT INTO users (username, password) VALUES (?, ?)');
             $stmt->execute([$username, $hash]);
             $_SESSION['user_id'] = $db->lastInsertId();
             $_SESSION['username'] = $username;
@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
     } else {
-        $stmt = $db->prepare("SELECT * FROM users WHERE username = ?");
+        $stmt = $db->prepare('SELECT * FROM users WHERE username = ?');
         $stmt->execute([$username]);
         $user = $stmt->fetch();
         $storedPassword = $user['password'] ?? '';
@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($ok) {
                     $hash = password_hash($password, PASSWORD_DEFAULT);
-                    $stmt = $db->prepare("UPDATE users SET password = ? WHERE id = ?");
+                    $stmt = $db->prepare('UPDATE users SET password = ? WHERE id = ?');
                     $stmt->execute([$hash, $user['id']]);
                 }
             }

@@ -1,0 +1,16 @@
+parameters:
+    paths:
+        - auth.php
+        - db.php
+        - index.php
+
+    # Level 0-10 (10 is strictest). Start low for older code, then raise later.
+    level: 3
+
+    # Add false positives here when needed.
+    ignoreErrors:
+        # - '#Call to an undefined method .*#'
+
+    excludePaths:
+        analyseAndScan:
+            - app/Legacy/ThatOneCursedFile.php (?)
