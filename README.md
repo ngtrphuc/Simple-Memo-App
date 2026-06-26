@@ -36,6 +36,20 @@ Run as a desktop app:
 npm start
 ```
 
+## Code Quality
+
+Run Rector in dry-run mode:
+
+```bash
+composer rector:dry
+```
+
+Apply Rector changes:
+
+```bash
+composer rector
+```
+
 ## Project Structure
 
 - `auth.php` handles authentication

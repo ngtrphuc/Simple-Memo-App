@@ -1,56 +1,57 @@
 <?php
 require 'db.php';
+require 'lang.php';
 
 function getRepeatModeOptions()
 {
     return [
-        'none' => 'Do not repeat',
-        'daily' => 'Every day',
-        'weekly' => 'Every week',
-        'monthly' => 'Every month',
-        'yearly' => 'Every year',
-        'interval' => 'Every few minutes / hours / days',
-        'weekly_days' => 'Pick weekdays',
-        'monthly_dates' => 'Pick month dates',
+        'none' => t('repeat_none'),
+        'daily' => t('repeat_daily'),
+        'weekly' => t('repeat_weekly'),
+        'monthly' => t('repeat_monthly'),
+        'yearly' => t('repeat_yearly'),
+        'interval' => t('repeat_interval'),
+        'weekly_days' => t('repeat_weekly_days'),
+        'monthly_dates' => t('repeat_monthly_dates'),
     ];
 }
 
 function getIntervalUnitOptions()
 {
     return [
-        'minute' => 'minutes',
-        'hour' => 'hours',
-        'day' => 'days',
-        'week' => 'weeks',
-        'month' => 'months',
-        'year' => 'years',
+        'minute' => t('unit_minute'),
+        'hour' => t('unit_hour'),
+        'day' => t('unit_day'),
+        'week' => t('unit_week'),
+        'month' => t('unit_month'),
+        'year' => t('unit_year'),
     ];
 }
 
 function getWeekdayLabels()
 {
     return [
-        0 => 'Sun',
-        1 => 'Mon',
-        2 => 'Tue',
-        3 => 'Wed',
-        4 => 'Thu',
-        5 => 'Fri',
-        6 => 'Sat',
+        0 => t('wd_sun'),
+        1 => t('wd_mon'),
+        2 => t('wd_tue'),
+        3 => t('wd_wed'),
+        4 => t('wd_thu'),
+        5 => t('wd_fri'),
+        6 => t('wd_sat'),
     ];
 }
 
 function getRepeatHintMap()
 {
     return [
-        'none' => 'One alert only.',
-        'daily' => 'Repeats every day at the same time.',
-        'weekly' => 'Repeats every week on the same weekday and time.',
-        'monthly' => 'Repeats every month on the same date and time.',
-        'yearly' => 'Repeats every year on the same date and time.',
-        'interval' => 'Choose an exact interval such as every 15 minutes or every 2 hours.',
-        'weekly_days' => 'Pick one or more weekdays. The time stays the same as the reminder time above.',
-        'monthly_dates' => 'Pick one or more dates in the month. The time stays the same as the reminder time above.',
+        'none' => t('hint_none'),
+        'daily' => t('hint_daily'),
+        'weekly' => t('hint_weekly'),
+        'monthly' => t('hint_monthly'),
+        'yearly' => t('hint_yearly'),
+        'interval' => t('hint_interval'),
+        'weekly_days' => t('hint_weekly_days'),
+        'monthly_dates' => t('hint_monthly_dates'),
     ];
 }
 
@@ -216,26 +217,26 @@ function getRepeatLabel($mode, array $config)
     }
 
     if ($mode === 'daily') {
-        return 'Every day';
+        return t('lbl_every_day');
     }
 
     if ($mode === 'weekly') {
-        return 'Every week';
+        return t('lbl_every_week');
     }
 
     if ($mode === 'monthly') {
-        return 'Every month';
+        return t('lbl_every_month');
     }
 
     if ($mode === 'yearly') {
-        return 'Every year';
+        return t('lbl_every_year');
     }
 
     if ($mode === 'interval') {
         $value = max(1, (int) ($config['value'] ?? 1));
         $unit = normalizeIntervalUnit($config['unit'] ?? 'hour');
 
-        return 'Every '.$value.' '.pluralizeUnit($unit, $value);
+        return t('lbl_every').' '.$value.' '.pluralizeUnit($unit, $value);
     }
 
     if ($mode === 'weekly_days') {
@@ -248,13 +249,13 @@ function getRepeatLabel($mode, array $config)
             }
         }
 
-        return $parts ? 'Every '.implode(', ', $parts) : 'Weekly pattern';
+        return $parts ? t('lbl_every').' '.implode(', ', $parts) : t('lbl_weekly_pattern');
     }
 
     if ($mode === 'monthly_dates') {
         $parts = normalizeNumericSelection($config['monthdays'] ?? [], 1, 31);
 
-        return $parts ? 'Monthly on '.implode(', ', $parts) : 'Monthly pattern';
+        return $parts ? t('lbl_monthly_on').' '.implode(', ', $parts) : t('lbl_monthly_pattern');
     }
 
     return '';
@@ -517,11 +518,11 @@ $editWeekdays = normalizeNumericSelection($editPattern['config']['weekdays'] ?? 
 $editMonthdays = normalizeNumericSelection($editPattern['config']['monthdays'] ?? [], 1, 31);
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="<?php echo htmlspecialchars(currentLang()); ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Memo App</title>
+    <title><?php echo t('app_title'); ?></title>
     <style>
         :root {
             --bg: #eef2f6;
@@ -649,6 +650,22 @@ $editMonthdays = normalizeNumericSelection($editPattern['config']['monthdays'] ?
 
         .hello {
             font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .lang-select {
+            width: auto;
+            margin: 0;
+            padding: 5px 8px;
+            font-size: 13px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--panel);
+            color: var(--text);
+            cursor: pointer;
         }
 
         .lbl {
@@ -793,26 +810,27 @@ $editMonthdays = normalizeNumericSelection($editPattern['config']['monthdays'] ?
 <body>
 <div class="container">
     <div class="top">
-        <h1>Memo App</h1>
+        <h1><?php echo t('app_title'); ?></h1>
         <div class="hello">
-            Hello, <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong>
-            <a class="link" href="auth.php?action=logout">Logout</a>
+            <?php echo langSelect(); ?>
+            <?php echo t('hello'); ?>, <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong>
+            <a class="link" href="auth.php?action=logout"><?php echo t('logout'); ?></a>
         </div>
     </div>
 
     <div class="box">
         <form method="post" data-repeat-form>
             <?php if ($edit) { ?>
-                <h3>Edit memo</h3>
+                <h3><?php echo t('edit_memo'); ?></h3>
                 <input type="hidden" name="action" value="edit">
                 <input type="hidden" name="id" value="<?php echo $edit['id']; ?>">
-                <input type="text" name="title" value="<?php echo htmlspecialchars($edit['title']); ?>" placeholder="Title">
-                <textarea name="content" placeholder="Content"><?php echo htmlspecialchars($edit['content']); ?></textarea>
-                <label class="lbl">Remind me at (optional)</label>
+                <input type="text" name="title" value="<?php echo htmlspecialchars($edit['title']); ?>" placeholder="<?php echo t('title'); ?>">
+                <textarea name="content" placeholder="<?php echo t('content'); ?>"><?php echo htmlspecialchars($edit['content']); ?></textarea>
+                <label class="lbl"><?php echo t('remind_label'); ?></label>
                 <input type="datetime-local" name="remind_at" value="<?php echo htmlspecialchars(formatReminderForInput($edit['remind_at'] ?? '')); ?>">
                 <div class="repeat-card">
-                    <span class="stack-note">Flexible repeat scheduler</span>
-                    <label class="lbl">Repeat pattern</label>
+                    <span class="stack-note"><?php echo t('repeat_scheduler'); ?></span>
+                    <label class="lbl"><?php echo t('repeat_pattern'); ?></label>
                     <select name="repeat_mode" data-repeat-mode>
                         <?php foreach ($repeatModeOptions as $value => $label) { ?>
                             <option value="<?php echo htmlspecialchars($value); ?>" <?php echo $editPattern['mode'] === $value ? 'selected' : ''; ?>><?php echo htmlspecialchars($label); ?></option>
@@ -821,7 +839,7 @@ $editMonthdays = normalizeNumericSelection($editPattern['config']['monthdays'] ?
                     <p class="repeat-help" data-repeat-hint><?php echo htmlspecialchars($repeatHints[$editPattern['mode']] ?? $repeatHints['none']); ?></p>
 
                     <div class="repeat-panel" data-repeat-panel="interval">
-                        <label class="lbl">Repeat every</label>
+                        <label class="lbl"><?php echo t('repeat_every'); ?></label>
                         <div class="interval-row">
                             <input type="number" min="1" max="999" name="repeat_interval_value" value="<?php echo $editIntervalValue; ?>" data-repeat-input>
                             <select name="repeat_interval_unit" data-repeat-input>
@@ -833,7 +851,7 @@ $editMonthdays = normalizeNumericSelection($editPattern['config']['monthdays'] ?
                     </div>
 
                     <div class="repeat-panel" data-repeat-panel="weekly_days">
-                        <label class="lbl">Choose weekdays</label>
+                        <label class="lbl"><?php echo t('choose_weekdays'); ?></label>
                         <div class="chip-grid weekday-grid">
                             <?php foreach ($weekdayLabels as $weekdayValue => $weekdayLabel) { ?>
                                 <label class="chip">
@@ -845,7 +863,7 @@ $editMonthdays = normalizeNumericSelection($editPattern['config']['monthdays'] ?
                     </div>
 
                     <div class="repeat-panel" data-repeat-panel="monthly_dates">
-                        <label class="lbl">Choose dates in the month</label>
+                        <label class="lbl"><?php echo t('choose_monthdays'); ?></label>
                         <div class="chip-grid monthday-grid">
                             <?php for ($day = 1; $day <= 31; $day++) { ?>
                                 <label class="chip">
@@ -857,19 +875,19 @@ $editMonthdays = normalizeNumericSelection($editPattern['config']['monthdays'] ?
                     </div>
                 </div>
                 <div class="actions">
-                    <button type="submit" class="btn">Update</button>
-                    <a class="link" href="index.php">Cancel</a>
+                    <button type="submit" class="btn"><?php echo t('update'); ?></button>
+                    <a class="link" href="index.php"><?php echo t('cancel'); ?></a>
                 </div>
             <?php } else { ?>
-                <h3>Add new memo</h3>
+                <h3><?php echo t('add_memo'); ?></h3>
                 <input type="hidden" name="action" value="add">
-                <input type="text" name="title" placeholder="Title">
-                <textarea name="content" placeholder="Content"></textarea>
-                <label class="lbl">Remind me at (optional)</label>
+                <input type="text" name="title" placeholder="<?php echo t('title'); ?>">
+                <textarea name="content" placeholder="<?php echo t('content'); ?>"></textarea>
+                <label class="lbl"><?php echo t('remind_label'); ?></label>
                 <input type="datetime-local" name="remind_at">
                 <div class="repeat-card">
-                    <span class="stack-note">Flexible repeat scheduler</span>
-                    <label class="lbl">Repeat pattern</label>
+                    <span class="stack-note"><?php echo t('repeat_scheduler'); ?></span>
+                    <label class="lbl"><?php echo t('repeat_pattern'); ?></label>
                     <select name="repeat_mode" data-repeat-mode>
                         <?php foreach ($repeatModeOptions as $value => $label) { ?>
                             <option value="<?php echo htmlspecialchars($value); ?>"><?php echo htmlspecialchars($label); ?></option>
@@ -878,7 +896,7 @@ $editMonthdays = normalizeNumericSelection($editPattern['config']['monthdays'] ?
                     <p class="repeat-help" data-repeat-hint><?php echo htmlspecialchars($repeatHints['none']); ?></p>
 
                     <div class="repeat-panel" data-repeat-panel="interval">
-                        <label class="lbl">Repeat every</label>
+                        <label class="lbl"><?php echo t('repeat_every'); ?></label>
                         <div class="interval-row">
                             <input type="number" min="1" max="999" name="repeat_interval_value" value="1" data-repeat-input>
                             <select name="repeat_interval_unit" data-repeat-input>
@@ -890,7 +908,7 @@ $editMonthdays = normalizeNumericSelection($editPattern['config']['monthdays'] ?
                     </div>
 
                     <div class="repeat-panel" data-repeat-panel="weekly_days">
-                        <label class="lbl">Choose weekdays</label>
+                        <label class="lbl"><?php echo t('choose_weekdays'); ?></label>
                         <div class="chip-grid weekday-grid">
                             <?php foreach ($weekdayLabels as $weekdayValue => $weekdayLabel) { ?>
                                 <label class="chip">
@@ -902,7 +920,7 @@ $editMonthdays = normalizeNumericSelection($editPattern['config']['monthdays'] ?
                     </div>
 
                     <div class="repeat-panel" data-repeat-panel="monthly_dates">
-                        <label class="lbl">Choose dates in the month</label>
+                        <label class="lbl"><?php echo t('choose_monthdays'); ?></label>
                         <div class="chip-grid monthday-grid">
                             <?php for ($day = 1; $day <= 31; $day++) { ?>
                                 <label class="chip">
@@ -913,13 +931,13 @@ $editMonthdays = normalizeNumericSelection($editPattern['config']['monthdays'] ?
                         </div>
                     </div>
                 </div>
-                <button type="submit" class="btn">Save</button>
+                <button type="submit" class="btn"><?php echo t('save'); ?></button>
             <?php } ?>
         </form>
     </div>
 
     <?php if (! $memos) { ?>
-        <div class="box empty-state">No memos yet.</div>
+        <div class="box empty-state"><?php echo t('no_memos'); ?></div>
     <?php } ?>
 
     <?php foreach ($memos as $memo) { ?>
@@ -946,11 +964,11 @@ $editMonthdays = normalizeNumericSelection($editPattern['config']['monthdays'] ?
             <?php } ?>
             <div class="date"><?php echo $memo['created_at']; ?></div>
             <div class="actions">
-                <a class="link" href="index.php?edit=<?php echo $memo['id']; ?>">Edit</a>
+                <a class="link" href="index.php?edit=<?php echo $memo['id']; ?>"><?php echo t('edit'); ?></a>
                 <form method="post">
                     <input type="hidden" name="action" value="delete">
                     <input type="hidden" name="id" value="<?php echo $memo['id']; ?>">
-                    <button type="button" class="btn-gray" onclick="confirmDelete(this)">Delete</button>
+                    <button type="button" class="btn-gray" onclick="confirmDelete(this)"><?php echo t('delete'); ?></button>
                 </form>
             </div>
         </div>
@@ -958,8 +976,10 @@ $editMonthdays = normalizeNumericSelection($editPattern['config']['monthdays'] ?
 </div>
 <script>
 function confirmDelete(button) {
-    if (button.innerText === 'Delete') {
-        button.innerText = 'Sure?';
+    if (button.dataset.armed !== '1') {
+        button.dataset.armed = '1';
+        button.dataset.original = button.innerText;
+        button.innerText = <?php echo json_encode(t('sure'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
     } else {
         button.form.submit();
     }
@@ -970,16 +990,13 @@ if ('Notification' in window && Notification.permission === 'default') {
 }
 
 var alreadyNotified = [];
-var repeatHints = {
-    none: 'One alert only.',
-    daily: 'Repeats every day at the same time.',
-    weekly: 'Repeats every week on the same weekday and time.',
-    monthly: 'Repeats every month on the same date and time.',
-    yearly: 'Repeats every year on the same date and time.',
-    interval: 'Choose an exact interval such as every 15 minutes or every 2 hours.',
-    weekly_days: 'Pick one or more weekdays. The time stays the same as the reminder time above.',
-    monthly_dates: 'Pick one or more dates in the month. The time stays the same as the reminder time above.'
-};
+var repeatHints = <?php echo json_encode($repeatHints, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+var jsLang = <?php echo json_encode([
+    'setReminderFirst' => t('hint_reminder_first'),
+    'notificationTitle' => t('reminder_notification_title'),
+    'alertPrefix' => t('reminder_alert_prefix'),
+    'rescheduleError' => t('reschedule_error'),
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 
 function formatReminderText(remindAt, repeatLabel) {
     return '\u23F0 ' + remindAt.replace('T', ' ') + (repeatLabel ? ' | ' + repeatLabel : '');
@@ -1021,7 +1038,7 @@ function rescheduleReminder(item) {
             updateReminderElement(item, data.remind_at, data.repeat_mode || repeatMode, data.repeat_label || '');
         })
         .catch(function (error) {
-            console.error('Failed to reschedule reminder', error);
+            console.error(jsLang.rescheduleError, error);
         });
 }
 
@@ -1043,7 +1060,7 @@ function toggleRepeatOptions(form) {
 
     if (hint) {
         if (!hasReminder && mode !== 'none') {
-            hint.textContent = 'Set a reminder time first. The repeat settings will be saved and start from that time.';
+            hint.textContent = jsLang.setReminderFirst;
         } else {
             hint.textContent = repeatHints[mode] || repeatHints.none;
         }
@@ -1090,9 +1107,9 @@ function checkReminders() {
             alreadyNotified.push(notifyKey);
 
             if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification('Memo reminder', { body: title });
+                new Notification(jsLang.notificationTitle, { body: title });
             } else {
-                alert('Reminder: ' + title);
+                alert(jsLang.alertPrefix + ' ' + title);
             }
 
             if (repeatMode !== 'none') {

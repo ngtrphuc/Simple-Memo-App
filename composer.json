@@ -1,6 +1,13 @@
 {
+    "scripts": {
+        "rector": "vendor/bin/rector process --ansi",
+        "rector:dry": "vendor/bin/rector process --dry-run --ansi"
+    },
     "require-dev": {
         "laravel/pint": "^1.29",
-        "larastan/larastan": "^3.10"
+        "larastan/larastan": "^3.10",
+        "barryvdh/laravel-ide-helper": "^3.7",
+        "rector/rector": "^2.5",
+        "driftingly/rector-laravel": "^2.5"
     }
 }

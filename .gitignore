@@ -3,3 +3,4 @@ memo.sqlite-*
 dist
 node_modules
 vendor
+storage/rector

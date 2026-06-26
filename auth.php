@@ -1,5 +1,6 @@
 <?php
 require 'db.php';
+require 'lang.php';
 
 $action = $_GET['action'] ?? 'login';
 $oldUsername = '';
@@ -30,13 +31,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $oldUsername = $username;
 
     if ($username === '' || $password === '') {
-        $error = 'Please fill in all fields.';
+        $error = t('err_fill_all');
     } elseif ($action === 'register') {
         $stmt = $db->prepare('SELECT id FROM users WHERE username = ?');
         $stmt->execute([$username]);
 
         if ($stmt->fetch()) {
-            $error = 'Username already exists.';
+            $error = t('err_user_exists');
         } else {
             $hash = password_hash($password, PASSWORD_DEFAULT);
             $stmt = $db->prepare('INSERT INTO users (username, password) VALUES (?, ?)');
@@ -75,18 +76,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        $error = 'Wrong username or password.';
+        $error = t('err_wrong_login');
     }
 }
 
 $isRegister = $action === 'register';
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="<?php echo htmlspecialchars(currentLang()); ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $isRegister ? 'Register' : 'Login'; ?></title>
+    <title><?php echo $isRegister ? t('register') : t('login'); ?></title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -141,26 +142,39 @@ $isRegister = $action === 'register';
             margin-top: 14px;
             text-decoration: none;
         }
+
+        .lang-select {
+            width: auto;
+            display: inline-block;
+            padding: 5px 8px;
+            margin: 0;
+            font-size: 13px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background: #fff;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
     <div class="box">
-        <h2><?php echo $isRegister ? 'Register' : 'Login'; ?></h2>
+        <div style="text-align:right;margin-bottom:12px;"><?php echo langSelect(); ?></div>
+        <h2><?php echo $isRegister ? t('register') : t('login'); ?></h2>
 
         <?php if ($error) { ?>
             <div class="error"><?php echo htmlspecialchars($error); ?></div>
         <?php } ?>
 
         <form method="post">
-            <input type="text" name="username" placeholder="Username" value="<?php echo htmlspecialchars($oldUsername); ?>">
-            <input type="password" name="password" placeholder="Password">
-            <button type="submit"><?php echo $isRegister ? 'Create account' : 'Login'; ?></button>
+            <input type="text" name="username" placeholder="<?php echo t('username'); ?>" value="<?php echo htmlspecialchars($oldUsername); ?>">
+            <input type="password" name="password" placeholder="<?php echo t('password'); ?>">
+            <button type="submit"><?php echo $isRegister ? t('create_account') : t('login'); ?></button>
         </form>
 
         <?php if ($isRegister) { ?>
-            <a href="auth.php">Already have an account? Login</a>
+            <a href="auth.php"><?php echo t('have_account'); ?></a>
         <?php } else { ?>
-            <a href="auth.php?action=register">No account yet? Register</a>
+            <a href="auth.php?action=register"><?php echo t('no_account'); ?></a>
         <?php } ?>
     </div>
 </body>
