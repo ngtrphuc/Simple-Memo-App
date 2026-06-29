@@ -1,24 +1,33 @@
 # Simple Memo App
 
-Simple Memo App is a small PHP note-taking app with user login, SQLite storage, and an optional Electron wrapper for running it like a desktop app.
+Simple Memo App is a small PHP note-taking app with user login, SQLite storage, and an
+optional Electron wrapper for running it like a desktop app.
 
 ## Features
 
-- User registration and login
+- User registration and login (CSRF-protected, session regenerated on login)
 - Create, edit, and delete personal memos
-- Optional memo reminders while the app is open
+- Memo reminders with a flexible repeat scheduler (daily/weekly/monthly/yearly,
+  custom intervals, specific weekdays, specific month dates) while the app is open
 - SQLite-based local data storage
+- Multi-language UI (English / 日本語 / Tiếng Việt)
 - Run in a browser or as a lightweight Electron desktop app
 
 ## Stack
 
-- PHP
-- SQLite
-- Electron
+- PHP 8.3 (PDO + SQLite)
+- Vanilla JS frontend
+- Electron (optional desktop wrapper)
 
 ## Getting Started
 
-Install dependencies for the desktop wrapper:
+Install PHP dependencies (now required — the app autoloads classes from `src/`):
+
+```bash
+composer install
+```
+
+Install the desktop wrapper dependencies:
 
 ```bash
 npm install
@@ -36,23 +45,47 @@ Run as a desktop app:
 npm start
 ```
 
+> Note: because `db.php` now loads `vendor/autoload.php`, you must run `composer install`
+> before the app will start in either the browser or Electron.
+
 ## Code Quality
 
-Run Rector in dry-run mode:
-
 ```bash
-composer rector:dry
-```
-
-Apply Rector changes:
-
-```bash
-composer rector
+composer test         # PHPUnit
+composer analyse      # PHPStan (level max)
+composer pint:test    # code style check (PSR-12)
+composer pint         # apply code style fixes
+composer rector:dry   # preview automated refactors
+composer rector       # apply automated refactors
+composer audit        # dependency audit
+composer check        # pint:test + analyse + test + audit
 ```
 
 ## Project Structure
 
-- `auth.php` handles authentication
-- `index.php` renders the memo interface
-- `db.php` initializes the SQLite database
-- `main.js` starts the Electron window
+```
+.
+├── auth.php              # authentication (register/login/logout), CSRF + session hardening
+├── db.php                # PDO bootstrap, schema migration, autoload
+├── index.php             # memo UI + thin HTTP handler
+├── lang.php              # i18n strings + helpers (t, langSelect, currentLang)
+├── main.js               # Electron entry
+├── start-electron.js     # Electron launcher
+├── src/
+│   ├── Reminder.php          # pure reminder/repeat date math (tested)
+│   ├── RepeatLabel.php       # repeat-pattern display labels (translator-injected)
+│   ├── Csrf.php              # CSRF token + verification
+│   └── MemoRepository.php    # PDO memo access, user_id scoped
+├── tests/
+│   ├── ReminderTest.php
+│   └── CsrfTest.php
+├── composer.json
+├── phpstan.neon
+├── rector.php
+├── pint.json
+├── phpunit.xml
+└── docs/
+    └── reference-context.md
+```
+
+See `CHANGES.md` for the full list of changes made in the refactor.

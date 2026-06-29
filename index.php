@@ -1,421 +1,41 @@
 <?php
+
+declare(strict_types=1);
+
 require 'db.php';
 require 'lang.php';
 
-function getRepeatModeOptions()
-{
-    return [
-        'none' => t('repeat_none'),
-        'daily' => t('repeat_daily'),
-        'weekly' => t('repeat_weekly'),
-        'monthly' => t('repeat_monthly'),
-        'yearly' => t('repeat_yearly'),
-        'interval' => t('repeat_interval'),
-        'weekly_days' => t('repeat_weekly_days'),
-        'monthly_dates' => t('repeat_monthly_dates'),
-    ];
-}
-
-function getIntervalUnitOptions()
-{
-    return [
-        'minute' => t('unit_minute'),
-        'hour' => t('unit_hour'),
-        'day' => t('unit_day'),
-        'week' => t('unit_week'),
-        'month' => t('unit_month'),
-        'year' => t('unit_year'),
-    ];
-}
-
-function getWeekdayLabels()
-{
-    return [
-        0 => t('wd_sun'),
-        1 => t('wd_mon'),
-        2 => t('wd_tue'),
-        3 => t('wd_wed'),
-        4 => t('wd_thu'),
-        5 => t('wd_fri'),
-        6 => t('wd_sat'),
-    ];
-}
-
-function getRepeatHintMap()
-{
-    return [
-        'none' => t('hint_none'),
-        'daily' => t('hint_daily'),
-        'weekly' => t('hint_weekly'),
-        'monthly' => t('hint_monthly'),
-        'yearly' => t('hint_yearly'),
-        'interval' => t('hint_interval'),
-        'weekly_days' => t('hint_weekly_days'),
-        'monthly_dates' => t('hint_monthly_dates'),
-    ];
-}
-
-function normalizeRepeatMode($value)
-{
-    $allowed = array_keys(getRepeatModeOptions());
-
-    return in_array($value, $allowed, true) ? $value : 'none';
-}
-
-function parseReminderDate($value)
-{
-    if (! is_string($value) || trim($value) === '') {
-        return null;
-    }
-
-    $formats = ['Y-m-d\TH:i:s', 'Y-m-d\TH:i', 'Y-m-d H:i:s', 'Y-m-d H:i'];
-
-    foreach ($formats as $format) {
-        $date = DateTimeImmutable::createFromFormat($format, $value);
-        if ($date instanceof DateTimeImmutable) {
-            return $date;
-        }
-    }
-
-    try {
-        return new DateTimeImmutable($value);
-    } catch (Exception $e) {
-        return null;
-    }
-}
-
-function formatReminderForInput($value)
-{
-    $date = parseReminderDate($value);
-
-    return $date ? $date->format('Y-m-d\TH:i') : '';
-}
-
-function formatReminderForDisplay($value)
-{
-    $date = parseReminderDate($value);
-
-    return $date ? $date->format('Y-m-d H:i') : '';
-}
-
-function decodeRepeatConfig($value)
-{
-    if (! is_string($value) || trim($value) === '') {
-        return [];
-    }
-
-    $decoded = json_decode($value, true);
-
-    return is_array($decoded) ? $decoded : [];
-}
-
-function encodeRepeatConfig(array $config)
-{
-    return $config ? json_encode($config, JSON_UNESCAPED_SLASHES) : '';
-}
-
-function normalizeIntervalUnit($value)
-{
-    $allowed = array_keys(getIntervalUnitOptions());
-
-    return in_array($value, $allowed, true) ? $value : 'hour';
-}
-
-function normalizeNumericSelection($values, $min, $max)
-{
-    $normalized = [];
-
-    foreach ((array) $values as $value) {
-        $number = (int) $value;
-        if ($number >= $min && $number <= $max) {
-            $normalized[$number] = $number;
-        }
-    }
-
-    $result = array_values($normalized);
-    sort($result);
-
-    return $result;
-}
-
-function normalizeRepeatPattern($mode, array $rawConfig, $remindAt)
-{
-    $mode = normalizeRepeatMode($mode);
-    $reminder = parseReminderDate($remindAt);
-
-    if (! $reminder || $mode === 'none') {
-        return [
-            'mode' => 'none',
-            'config' => [],
-        ];
-    }
-
-    if ($mode === 'interval') {
-        $value = (int) ($rawConfig['interval_value'] ?? $rawConfig['value'] ?? 1);
-        $value = max(1, min(999, $value));
-
-        return [
-            'mode' => 'interval',
-            'config' => [
-                'value' => $value,
-                'unit' => normalizeIntervalUnit($rawConfig['interval_unit'] ?? $rawConfig['unit'] ?? 'hour'),
-            ],
-        ];
-    }
-
-    if ($mode === 'weekly_days') {
-        $weekdays = normalizeNumericSelection($rawConfig['repeat_weekdays'] ?? $rawConfig['weekdays'] ?? [], 0, 6);
-        if (! $weekdays) {
-            $weekdays = [(int) $reminder->format('w')];
-        }
-
-        return [
-            'mode' => 'weekly_days',
-            'config' => ['weekdays' => $weekdays],
-        ];
-    }
-
-    if ($mode === 'monthly_dates') {
-        $monthdays = normalizeNumericSelection($rawConfig['repeat_monthdays'] ?? $rawConfig['monthdays'] ?? [], 1, 31);
-        if (! $monthdays) {
-            $monthdays = [(int) $reminder->format('j')];
-        }
-
-        return [
-            'mode' => 'monthly_dates',
-            'config' => ['monthdays' => $monthdays],
-        ];
-    }
-
-    return [
-        'mode' => $mode,
-        'config' => [],
-    ];
-}
-
-function normalizeStoredRepeatPattern($mode, $repeatConfig, $remindAt)
-{
-    return normalizeRepeatPattern($mode, decodeRepeatConfig($repeatConfig), $remindAt);
-}
-
-function pluralizeUnit($unit, $count)
-{
-    $labels = getIntervalUnitOptions();
-    $label = $labels[$unit] ?? $unit;
-
-    if ($count === 1 && substr($label, -1) === 's') {
-        return substr($label, 0, -1);
-    }
-
-    return $label;
-}
-
-function getRepeatLabel($mode, array $config)
-{
-    if ($mode === 'none') {
-        return '';
-    }
-
-    if ($mode === 'daily') {
-        return t('lbl_every_day');
-    }
-
-    if ($mode === 'weekly') {
-        return t('lbl_every_week');
-    }
-
-    if ($mode === 'monthly') {
-        return t('lbl_every_month');
-    }
-
-    if ($mode === 'yearly') {
-        return t('lbl_every_year');
-    }
-
-    if ($mode === 'interval') {
-        $value = max(1, (int) ($config['value'] ?? 1));
-        $unit = normalizeIntervalUnit($config['unit'] ?? 'hour');
-
-        return t('lbl_every').' '.$value.' '.pluralizeUnit($unit, $value);
-    }
-
-    if ($mode === 'weekly_days') {
-        $labels = getWeekdayLabels();
-        $parts = [];
-
-        foreach ((array) ($config['weekdays'] ?? []) as $weekday) {
-            if (isset($labels[$weekday])) {
-                $parts[] = $labels[$weekday];
-            }
-        }
-
-        return $parts ? t('lbl_every').' '.implode(', ', $parts) : t('lbl_weekly_pattern');
-    }
-
-    if ($mode === 'monthly_dates') {
-        $parts = normalizeNumericSelection($config['monthdays'] ?? [], 1, 31);
-
-        return $parts ? t('lbl_monthly_on').' '.implode(', ', $parts) : t('lbl_monthly_pattern');
-    }
-
-    return '';
-}
-
-function getRepeatSummaryText($remindAt, $repeatLabel)
-{
-    $text = formatReminderForDisplay($remindAt);
-    if ($repeatLabel !== '') {
-        $text .= ' | '.$repeatLabel;
-    }
-
-    return $text;
-}
-
-function getNextIntervalDate(DateTimeImmutable $current, DateTimeImmutable $now, $value, $unit)
-{
-    $value = max(1, (int) $value);
-    $unit = normalizeIntervalUnit($unit);
-
-    if ($current > $now) {
-        return $current;
-    }
-
-    if (in_array($unit, ['minute', 'hour', 'day', 'week'], true)) {
-        $secondsMap = [
-            'minute' => 60,
-            'hour' => 3600,
-            'day' => 86400,
-            'week' => 604800,
-        ];
-
-        $stepSeconds = $secondsMap[$unit] * $value;
-        $diffSeconds = max(0, $now->getTimestamp() - $current->getTimestamp());
-        $steps = intdiv($diffSeconds, $stepSeconds) + 1;
-        $totalUnits = $steps * $value;
-
-        return $current->modify('+'.$totalUnits.' '.$unit.($totalUnits === 1 ? '' : 's'));
-    }
-
-    $candidate = $current;
-    do {
-        $candidate = $candidate->modify('+'.$value.' '.$unit.($value === 1 ? '' : 's'));
-    } while ($candidate <= $now);
-
-    return $candidate;
-}
-
-function getNextWeeklyDayDate(DateTimeImmutable $current, DateTimeImmutable $now, array $weekdays)
-{
-    $weekdays = normalizeNumericSelection($weekdays, 0, 6);
-
-    if (! $weekdays) {
-        return null;
-    }
-
-    $candidate = $current;
-
-    for ($i = 0; $i < 370; $i++) {
-        if ($candidate > $now && in_array((int) $candidate->format('w'), $weekdays, true)) {
-            return $candidate;
-        }
-
-        $candidate = $candidate->modify('+1 day');
-    }
-
-    return null;
-}
-
-function getNextMonthlyDate(DateTimeImmutable $current, DateTimeImmutable $now, array $monthdays)
-{
-    $monthdays = normalizeNumericSelection($monthdays, 1, 31);
-
-    if (! $monthdays) {
-        return null;
-    }
-
-    $candidate = $current;
-
-    for ($i = 0; $i < 800; $i++) {
-        if ($candidate > $now && in_array((int) $candidate->format('j'), $monthdays, true)) {
-            return $candidate;
-        }
-
-        $candidate = $candidate->modify('+1 day');
-    }
-
-    return null;
-}
-
-function getNextReminderAt($value, $repeatMode, array $repeatConfig = [], ?DateTimeImmutable $now = null)
-{
-    $current = parseReminderDate($value);
-
-    if (! $current) {
-        return null;
-    }
-
-    $now = $now ?: new DateTimeImmutable('now');
-    $repeatMode = normalizeRepeatMode($repeatMode);
-
-    if ($repeatMode === 'none') {
-        return null;
-    }
-
-    if ($repeatMode === 'daily') {
-        return getNextIntervalDate($current, $now, 1, 'day')->format('Y-m-d\TH:i');
-    }
-
-    if ($repeatMode === 'weekly') {
-        return getNextIntervalDate($current, $now, 1, 'week')->format('Y-m-d\TH:i');
-    }
-
-    if ($repeatMode === 'monthly') {
-        return getNextIntervalDate($current, $now, 1, 'month')->format('Y-m-d\TH:i');
-    }
-
-    if ($repeatMode === 'yearly') {
-        return getNextIntervalDate($current, $now, 1, 'year')->format('Y-m-d\TH:i');
-    }
-
-    if ($repeatMode === 'interval') {
-        $next = getNextIntervalDate($current, $now, $repeatConfig['value'] ?? 1, $repeatConfig['unit'] ?? 'hour');
-
-        return $next ? $next->format('Y-m-d\TH:i') : null;
-    }
-
-    if ($repeatMode === 'weekly_days') {
-        $next = getNextWeeklyDayDate($current, $now, $repeatConfig['weekdays'] ?? []);
-
-        return $next ? $next->format('Y-m-d\TH:i') : null;
-    }
-
-    if ($repeatMode === 'monthly_dates') {
-        $next = getNextMonthlyDate($current, $now, $repeatConfig['monthdays'] ?? []);
-
-        return $next ? $next->format('Y-m-d\TH:i') : null;
-    }
-
-    return null;
-}
+use App\Csrf;
+use App\MemoRepository;
+use App\Reminder;
+use App\RepeatLabel;
 
 if (! isset($_SESSION['user_id'])) {
     header('Location: auth.php');
     exit;
 }
 
-$userId = $_SESSION['user_id'];
-$repeatModeOptions = getRepeatModeOptions();
-$intervalUnitOptions = getIntervalUnitOptions();
-$weekdayLabels = getWeekdayLabels();
-$repeatHints = getRepeatHintMap();
+$userId = (int) $_SESSION['user_id'];
+$memos = new MemoRepository($db);
+
+// Translator passed to label helpers so domain code stays decoupled from i18n.
+$tr = t(...);
+
+$repeatModeOptions = RepeatLabel::modeOptions($tr);
+$intervalUnitOptions = RepeatLabel::intervalUnitOptions($tr);
+$weekdayLabels = RepeatLabel::weekdayLabels($tr);
+$repeatHints = RepeatLabel::hintMap($tr);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    Csrf::check();
+
     $action = $_POST['action'] ?? '';
-    $title = trim($_POST['title'] ?? '');
-    $content = trim($_POST['content'] ?? '');
-    $remind = formatReminderForInput(trim($_POST['remind_at'] ?? ''));
-    $repeatPattern = normalizeRepeatPattern(
-        $_POST['repeat_mode'] ?? 'none',
+    $title = trim((string) ($_POST['title'] ?? ''));
+    $content = trim((string) ($_POST['content'] ?? ''));
+    $remind = Reminder::formatReminderForInput(trim((string) ($_POST['remind_at'] ?? '')));
+
+    $repeatPattern = Reminder::normalizeRepeatPattern(
+        (string) ($_POST['repeat_mode'] ?? 'none'),
         [
             'interval_value' => $_POST['repeat_interval_value'] ?? 1,
             'interval_unit' => $_POST['repeat_interval_unit'] ?? 'hour',
@@ -425,29 +45,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $remind
     );
     $repeatMode = $repeatPattern['mode'];
-    $repeatConfig = encodeRepeatConfig($repeatPattern['config']);
+    $repeatConfig = Reminder::encodeRepeatConfig($repeatPattern['config']);
 
     if ($action === 'reschedule') {
         header('Content-Type: application/json');
 
-        $stmt = $db->prepare('SELECT remind_at, repeat_mode, repeat_config FROM memos WHERE id = ? AND user_id = ?');
-        $stmt->execute([$_POST['id'] ?? 0, $userId]);
-        $memo = $stmt->fetch();
+        $memo = $memos->find((int) ($_POST['id'] ?? 0), $userId);
 
-        if (! $memo) {
+        if ($memo === null) {
             echo json_encode(['success' => false]);
             exit;
         }
 
-        $currentRemindAt = formatReminderForInput($memo['remind_at'] ?? '');
-        $storedPattern = normalizeStoredRepeatPattern($memo['repeat_mode'] ?? 'none', $memo['repeat_config'] ?? '', $currentRemindAt);
+        $currentRemindAt = Reminder::formatReminderForInput($memo['remind_at'] ?? '');
+        $storedPattern = Reminder::normalizeStoredRepeatPattern(
+            (string) ($memo['repeat_mode'] ?? 'none'),
+            $memo['repeat_config'] ?? '',
+            $currentRemindAt
+        );
         $currentRepeatMode = $storedPattern['mode'];
         $currentRepeatConfig = $storedPattern['config'];
-        $currentRepeatLabel = getRepeatLabel($currentRepeatMode, $currentRepeatConfig);
-        $currentReminderTime = parseReminderDate($currentRemindAt);
+        $currentRepeatLabel = RepeatLabel::describe($tr, $currentRepeatMode, $currentRepeatConfig);
+        $currentReminderTime = Reminder::parseReminderDate($currentRemindAt);
         $now = new DateTimeImmutable('now');
 
-        if ($currentRemindAt === '' || $currentRepeatMode === 'none' || ! $currentReminderTime || $currentReminderTime > $now) {
+        if ($currentRemindAt === '' || $currentRepeatMode === 'none' || ! $currentReminderTime instanceof DateTimeImmutable || $currentReminderTime > $now) {
             echo json_encode([
                 'success' => true,
                 'remind_at' => $currentRemindAt,
@@ -457,9 +79,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        $nextRemindAt = getNextReminderAt($currentRemindAt, $currentRepeatMode, $currentRepeatConfig, $now);
+        $nextRemindAt = Reminder::getNextReminderAt($currentRemindAt, $currentRepeatMode, $currentRepeatConfig, $now);
 
-        if (! $nextRemindAt || $nextRemindAt === $currentRemindAt) {
+        if ($nextRemindAt === null || $nextRemindAt === $currentRemindAt) {
             echo json_encode([
                 'success' => true,
                 'remind_at' => $currentRemindAt,
@@ -469,8 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        $stmt = $db->prepare('UPDATE memos SET remind_at = ? WHERE id = ? AND user_id = ?');
-        $stmt->execute([$nextRemindAt, $_POST['id'] ?? 0, $userId]);
+        $memos->updateRemindAt((int) ($_POST['id'] ?? 0), $userId, $nextRemindAt);
 
         echo json_encode([
             'success' => true,
@@ -482,645 +103,343 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'add' && $title !== '') {
-        $stmt = $db->prepare('INSERT INTO memos (user_id, title, content, remind_at, repeat_mode, repeat_config, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-        $stmt->execute([$userId, $title, $content, $remind, $repeatMode, $repeatConfig, date('Y-m-d H:i:s')]);
+        $memos->create($userId, $title, $content, $remind, $repeatMode, $repeatConfig);
     }
 
     if ($action === 'edit' && $title !== '') {
-        $stmt = $db->prepare('UPDATE memos SET title = ?, content = ?, remind_at = ?, repeat_mode = ?, repeat_config = ? WHERE id = ? AND user_id = ?');
-        $stmt->execute([$title, $content, $remind, $repeatMode, $repeatConfig, $_POST['id'], $userId]);
+        $memos->update((int) ($_POST['id'] ?? 0), $userId, $title, $content, $remind, $repeatMode, $repeatConfig);
     }
 
     if ($action === 'delete') {
-        $stmt = $db->prepare('DELETE FROM memos WHERE id = ? AND user_id = ?');
-        $stmt->execute([$_POST['id'], $userId]);
+        $memos->delete((int) ($_POST['id'] ?? 0), $userId);
     }
 
     header('Location: index.php');
     exit;
 }
 
-$stmt = $db->prepare('SELECT * FROM memos WHERE user_id = ? ORDER BY id DESC');
-$stmt->execute([$userId]);
-$memos = $stmt->fetchAll();
+$memoList = $memos->allForUser($userId);
 
 $edit = null;
 if (isset($_GET['edit'])) {
-    $stmt = $db->prepare('SELECT * FROM memos WHERE id = ? AND user_id = ?');
-    $stmt->execute([$_GET['edit'], $userId]);
-    $edit = $stmt->fetch();
+    $edit = $memos->find((int) $_GET['edit'], $userId);
 }
 
-$editPattern = $edit ? normalizeStoredRepeatPattern($edit['repeat_mode'] ?? 'none', $edit['repeat_config'] ?? '', $edit['remind_at'] ?? '') : ['mode' => 'none', 'config' => []];
+$editPattern = $edit !== null
+    ? Reminder::normalizeStoredRepeatPattern((string) ($edit['repeat_mode'] ?? 'none'), $edit['repeat_config'] ?? '', $edit['remind_at'] ?? '')
+    : ['mode' => 'none', 'config' => []];
 $editIntervalValue = (int) ($editPattern['config']['value'] ?? 1);
-$editIntervalUnit = normalizeIntervalUnit($editPattern['config']['unit'] ?? 'hour');
-$editWeekdays = normalizeNumericSelection($editPattern['config']['weekdays'] ?? [], 0, 6);
-$editMonthdays = normalizeNumericSelection($editPattern['config']['monthdays'] ?? [], 1, 31);
+$editIntervalUnit = Reminder::normalizeIntervalUnit((string) ($editPattern['config']['unit'] ?? 'hour'));
+$editWeekdays = Reminder::normalizeNumericSelection($editPattern['config']['weekdays'] ?? [], 0, 6);
+$editMonthdays = Reminder::normalizeNumericSelection($editPattern['config']['monthdays'] ?? [], 1, 31);
+$memoCount = count($memoList);
+$scheduledCount = 0;
+$recurringCount = 0;
+
+foreach ($memoList as $memo) {
+    $hasReminder = Reminder::formatReminderForInput($memo['remind_at'] ?? '') !== '';
+
+    if ($hasReminder) {
+        $scheduledCount++;
+    }
+
+    if (($memo['repeat_mode'] ?? 'none') !== 'none') {
+        $recurringCount++;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo htmlspecialchars(currentLang()); ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo t('app_title'); ?></title>
-    <style>
-        :root {
-            --bg: #eef2f6;
-            --panel: #ffffff;
-            --border: #d9e1ea;
-            --text: #203040;
-            --muted: #607182;
-            --primary: #1d5fd1;
-            --primary-soft: #eaf2ff;
-            --accent: #c96a16;
-            --accent-soft: #fff3e5;
-            --shadow: 0 16px 40px rgba(31, 52, 73, 0.08);
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: "Segoe UI", "Trebuchet MS", sans-serif;
-            background:
-                radial-gradient(circle at top left, rgba(29, 95, 209, 0.12), transparent 32%),
-                linear-gradient(180deg, #f7f9fc 0%, var(--bg) 100%);
-            color: var(--text);
-            margin: 0;
-            padding: 30px 15px;
-        }
-
-        .container {
-            max-width: 760px;
-            margin: 0 auto;
-        }
-
-        .top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-
-        h1 {
-            margin: 0;
-            font-size: 32px;
-            letter-spacing: 0.02em;
-        }
-
-        h3 {
-            margin: 0 0 12px;
-        }
-
-        .box {
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 18px;
-            margin-bottom: 16px;
-            box-shadow: var(--shadow);
-        }
-
-        input, textarea, select {
-            width: 100%;
-            padding: 10px 12px;
-            margin-bottom: 10px;
-            border: 1px solid #cbd4de;
-            border-radius: 10px;
-            font-size: 14px;
-            font-family: inherit;
-            background: #fff;
-            color: var(--text);
-        }
-
-        input:focus, textarea:focus, select:focus {
-            outline: 2px solid rgba(29, 95, 209, 0.16);
-            border-color: var(--primary);
-        }
-
-        textarea {
-            height: 90px;
-            resize: vertical;
-        }
-
-        button {
-            padding: 10px 16px;
-            border: 0;
-            border-radius: 10px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: transform 0.16s ease, opacity 0.16s ease;
-        }
-
-        button:hover {
-            transform: translateY(-1px);
-        }
-
-        .btn {
-            background: var(--primary);
-            color: #fff;
-        }
-
-        .btn-gray {
-            background: #e7edf3;
-            color: var(--text);
-        }
-
-        .actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .date {
-            color: #8191a1;
-            font-size: 12px;
-            margin: 8px 0 12px;
-        }
-
-        .link {
-            color: var(--primary);
-            text-decoration: none;
-            margin-right: 10px;
-            font-weight: 600;
-        }
-
-        .hello {
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .lang-select {
-            width: auto;
-            margin: 0;
-            padding: 5px 8px;
-            font-size: 13px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            background: var(--panel);
-            color: var(--text);
-            cursor: pointer;
-        }
-
-        .lbl {
-            display: block;
-            font-size: 13px;
-            color: var(--muted);
-            margin-bottom: 6px;
-            font-weight: 600;
-        }
-
-        .remind {
-            color: var(--accent);
-            font-size: 13px;
-            margin: 8px 0;
-            padding: 10px 12px;
-            border-radius: 12px;
-            background: var(--accent-soft);
-            border: 1px solid rgba(201, 106, 22, 0.18);
-        }
-
-        .repeat-card {
-            margin-bottom: 14px;
-            padding: 14px;
-            border-radius: 14px;
-            border: 1px solid #d8e2ef;
-            background: linear-gradient(180deg, #fbfdff 0%, #f3f7fb 100%);
-        }
-
-        .repeat-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-
-        .repeat-panel {
-            display: none;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px dashed #d0d9e2;
-        }
-
-        .repeat-help {
-            margin: 0;
-            font-size: 12px;
-            color: var(--muted);
-            line-height: 1.45;
-        }
-
-        .stack-note {
-            display: inline-block;
-            margin-bottom: 10px;
-            padding: 6px 10px;
-            border-radius: 999px;
-            background: var(--primary-soft);
-            color: var(--primary);
-            font-size: 12px;
-            font-weight: 600;
-        }
-
-        .interval-row {
-            display: grid;
-            grid-template-columns: minmax(110px, 150px) 1fr;
-            gap: 10px;
-        }
-
-        .chip-grid {
-            display: grid;
-            gap: 8px;
-        }
-
-        .weekday-grid {
-            grid-template-columns: repeat(7, minmax(0, 1fr));
-        }
-
-        .monthday-grid {
-            grid-template-columns: repeat(auto-fit, minmax(54px, 1fr));
-            max-height: 188px;
-            overflow: auto;
-            padding-right: 2px;
-        }
-
-        .chip {
-            position: relative;
-        }
-
-        .chip input {
-            position: absolute;
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .chip span {
-            display: block;
-            padding: 10px 8px;
-            border-radius: 12px;
-            text-align: center;
-            border: 1px solid #ccd7e3;
-            background: #fff;
-            color: var(--text);
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.18s ease;
-        }
-
-        .chip input:checked + span {
-            border-color: var(--primary);
-            background: var(--primary-soft);
-            color: var(--primary);
-            font-weight: 700;
-            transform: translateY(-1px);
-        }
-
-        .chip input:focus + span {
-            outline: 2px solid rgba(29, 95, 209, 0.16);
-        }
-
-        .empty-state {
-            color: var(--muted);
-        }
-
-        @media (max-width: 680px) {
-            body {
-                padding: 18px 12px;
-            }
-
-            .top {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .weekday-grid {
-                grid-template-columns: repeat(4, minmax(0, 1fr));
-            }
-
-            .interval-row {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+    <title><?php echo htmlspecialchars(t('app_title')); ?></title>
+    <link rel="stylesheet" href="app.css">
 </head>
-<body>
-<div class="container">
-    <div class="top">
-        <h1><?php echo t('app_title'); ?></h1>
-        <div class="hello">
-            <?php echo langSelect(); ?>
-            <?php echo t('hello'); ?>, <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong>
-            <a class="link" href="auth.php?action=logout"><?php echo t('logout'); ?></a>
+<body class="workspace-page">
+<div class="workspace-shell">
+    <header class="workspace-header">
+        <div>
+            <span class="eyebrow"><?php echo htmlspecialchars(t('app_title')); ?></span>
+            <h1><?php echo htmlspecialchars(t('workspace_heading')); ?></h1>
+            <p class="lead"><?php echo htmlspecialchars(t('workspace_subtitle')); ?></p>
         </div>
-    </div>
 
-    <div class="box">
-        <form method="post" data-repeat-form>
-            <?php if ($edit) { ?>
-                <h3><?php echo t('edit_memo'); ?></h3>
-                <input type="hidden" name="action" value="edit">
-                <input type="hidden" name="id" value="<?php echo $edit['id']; ?>">
-                <input type="text" name="title" value="<?php echo htmlspecialchars($edit['title']); ?>" placeholder="<?php echo t('title'); ?>">
-                <textarea name="content" placeholder="<?php echo t('content'); ?>"><?php echo htmlspecialchars($edit['content']); ?></textarea>
-                <label class="lbl"><?php echo t('remind_label'); ?></label>
-                <input type="datetime-local" name="remind_at" value="<?php echo htmlspecialchars(formatReminderForInput($edit['remind_at'] ?? '')); ?>">
-                <div class="repeat-card">
-                    <span class="stack-note"><?php echo t('repeat_scheduler'); ?></span>
-                    <label class="lbl"><?php echo t('repeat_pattern'); ?></label>
-                    <select name="repeat_mode" data-repeat-mode>
-                        <?php foreach ($repeatModeOptions as $value => $label) { ?>
-                            <option value="<?php echo htmlspecialchars($value); ?>" <?php echo $editPattern['mode'] === $value ? 'selected' : ''; ?>><?php echo htmlspecialchars($label); ?></option>
-                        <?php } ?>
-                    </select>
-                    <p class="repeat-help" data-repeat-hint><?php echo htmlspecialchars($repeatHints[$editPattern['mode']] ?? $repeatHints['none']); ?></p>
-
-                    <div class="repeat-panel" data-repeat-panel="interval">
-                        <label class="lbl"><?php echo t('repeat_every'); ?></label>
-                        <div class="interval-row">
-                            <input type="number" min="1" max="999" name="repeat_interval_value" value="<?php echo $editIntervalValue; ?>" data-repeat-input>
-                            <select name="repeat_interval_unit" data-repeat-input>
-                                <?php foreach ($intervalUnitOptions as $value => $label) { ?>
-                                    <option value="<?php echo htmlspecialchars($value); ?>" <?php echo $editIntervalUnit === $value ? 'selected' : ''; ?>><?php echo htmlspecialchars($label); ?></option>
-                                <?php } ?>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="repeat-panel" data-repeat-panel="weekly_days">
-                        <label class="lbl"><?php echo t('choose_weekdays'); ?></label>
-                        <div class="chip-grid weekday-grid">
-                            <?php foreach ($weekdayLabels as $weekdayValue => $weekdayLabel) { ?>
-                                <label class="chip">
-                                    <input type="checkbox" name="repeat_weekdays[]" value="<?php echo $weekdayValue; ?>" <?php echo in_array($weekdayValue, $editWeekdays, true) ? 'checked' : ''; ?> data-repeat-input>
-                                    <span><?php echo htmlspecialchars($weekdayLabel); ?></span>
-                                </label>
-                            <?php } ?>
-                        </div>
-                    </div>
-
-                    <div class="repeat-panel" data-repeat-panel="monthly_dates">
-                        <label class="lbl"><?php echo t('choose_monthdays'); ?></label>
-                        <div class="chip-grid monthday-grid">
-                            <?php for ($day = 1; $day <= 31; $day++) { ?>
-                                <label class="chip">
-                                    <input type="checkbox" name="repeat_monthdays[]" value="<?php echo $day; ?>" <?php echo in_array($day, $editMonthdays, true) ? 'checked' : ''; ?> data-repeat-input>
-                                    <span><?php echo $day; ?></span>
-                                </label>
-                            <?php } ?>
-                        </div>
-                    </div>
-                </div>
-                <div class="actions">
-                    <button type="submit" class="btn"><?php echo t('update'); ?></button>
-                    <a class="link" href="index.php"><?php echo t('cancel'); ?></a>
-                </div>
-            <?php } else { ?>
-                <h3><?php echo t('add_memo'); ?></h3>
-                <input type="hidden" name="action" value="add">
-                <input type="text" name="title" placeholder="<?php echo t('title'); ?>">
-                <textarea name="content" placeholder="<?php echo t('content'); ?>"></textarea>
-                <label class="lbl"><?php echo t('remind_label'); ?></label>
-                <input type="datetime-local" name="remind_at">
-                <div class="repeat-card">
-                    <span class="stack-note"><?php echo t('repeat_scheduler'); ?></span>
-                    <label class="lbl"><?php echo t('repeat_pattern'); ?></label>
-                    <select name="repeat_mode" data-repeat-mode>
-                        <?php foreach ($repeatModeOptions as $value => $label) { ?>
-                            <option value="<?php echo htmlspecialchars($value); ?>"><?php echo htmlspecialchars($label); ?></option>
-                        <?php } ?>
-                    </select>
-                    <p class="repeat-help" data-repeat-hint><?php echo htmlspecialchars($repeatHints['none']); ?></p>
-
-                    <div class="repeat-panel" data-repeat-panel="interval">
-                        <label class="lbl"><?php echo t('repeat_every'); ?></label>
-                        <div class="interval-row">
-                            <input type="number" min="1" max="999" name="repeat_interval_value" value="1" data-repeat-input>
-                            <select name="repeat_interval_unit" data-repeat-input>
-                                <?php foreach ($intervalUnitOptions as $value => $label) { ?>
-                                    <option value="<?php echo htmlspecialchars($value); ?>" <?php echo $value === 'hour' ? 'selected' : ''; ?>><?php echo htmlspecialchars($label); ?></option>
-                                <?php } ?>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="repeat-panel" data-repeat-panel="weekly_days">
-                        <label class="lbl"><?php echo t('choose_weekdays'); ?></label>
-                        <div class="chip-grid weekday-grid">
-                            <?php foreach ($weekdayLabels as $weekdayValue => $weekdayLabel) { ?>
-                                <label class="chip">
-                                    <input type="checkbox" name="repeat_weekdays[]" value="<?php echo $weekdayValue; ?>" data-repeat-input>
-                                    <span><?php echo htmlspecialchars($weekdayLabel); ?></span>
-                                </label>
-                            <?php } ?>
-                        </div>
-                    </div>
-
-                    <div class="repeat-panel" data-repeat-panel="monthly_dates">
-                        <label class="lbl"><?php echo t('choose_monthdays'); ?></label>
-                        <div class="chip-grid monthday-grid">
-                            <?php for ($day = 1; $day <= 31; $day++) { ?>
-                                <label class="chip">
-                                    <input type="checkbox" name="repeat_monthdays[]" value="<?php echo $day; ?>" data-repeat-input>
-                                    <span><?php echo $day; ?></span>
-                                </label>
-                            <?php } ?>
-                        </div>
-                    </div>
-                </div>
-                <button type="submit" class="btn"><?php echo t('save'); ?></button>
-            <?php } ?>
-        </form>
-    </div>
-
-    <?php if (! $memos) { ?>
-        <div class="box empty-state"><?php echo t('no_memos'); ?></div>
-    <?php } ?>
-
-    <?php foreach ($memos as $memo) { ?>
-        <?php
-        $memoRemindAt = formatReminderForInput($memo['remind_at'] ?? '');
-        $memoPattern = normalizeStoredRepeatPattern($memo['repeat_mode'] ?? 'none', $memo['repeat_config'] ?? '', $memoRemindAt);
-        $memoRepeatMode = $memoPattern['mode'];
-        $memoRepeatLabel = getRepeatLabel($memoRepeatMode, $memoPattern['config']);
-        ?>
-        <div class="box">
-            <h3><?php echo htmlspecialchars($memo['title']); ?></h3>
-            <p><?php echo nl2br(htmlspecialchars($memo['content'])); ?></p>
-            <?php if ($memoRemindAt !== '') { ?>
-                <div
-                    class="remind"
-                    data-id="<?php echo (int) $memo['id']; ?>"
-                    data-remind="<?php echo htmlspecialchars($memoRemindAt); ?>"
-                    data-repeat-mode="<?php echo htmlspecialchars($memoRepeatMode); ?>"
-                    data-repeat-label="<?php echo htmlspecialchars($memoRepeatLabel); ?>"
-                    data-title="<?php echo htmlspecialchars($memo['title']); ?>"
-                >
-                    &#9200; <?php echo htmlspecialchars(getRepeatSummaryText($memoRemindAt, $memoRepeatLabel)); ?>
-                </div>
-            <?php } ?>
-            <div class="date"><?php echo $memo['created_at']; ?></div>
-            <div class="actions">
-                <a class="link" href="index.php?edit=<?php echo $memo['id']; ?>"><?php echo t('edit'); ?></a>
-                <form method="post">
-                    <input type="hidden" name="action" value="delete">
-                    <input type="hidden" name="id" value="<?php echo $memo['id']; ?>">
-                    <button type="button" class="btn-gray" onclick="confirmDelete(this)"><?php echo t('delete'); ?></button>
-                </form>
+        <div class="header-tools">
+            <div class="user-chip">
+                <?php echo htmlspecialchars(t('hello')); ?>,
+                <strong><?php echo htmlspecialchars((string) $_SESSION['username']); ?></strong>
             </div>
+            <?php echo langSelect(); ?>
+            <a class="btn btn-ghost btn-small" href="auth.php?action=logout"><?php echo htmlspecialchars(t('logout')); ?></a>
         </div>
-    <?php } ?>
+    </header>
+
+    <section class="stats-grid" aria-label="<?php echo htmlspecialchars(t('workspace_heading')); ?>">
+        <div class="card-panel stat-card">
+            <span class="eyebrow"><?php echo htmlspecialchars(t('memo_count_label')); ?></span>
+            <span class="stat-value"><?php echo $memoCount; ?></span>
+            <span class="stat-label"><?php echo htmlspecialchars(t('memo_list_title')); ?></span>
+        </div>
+        <div class="card-panel stat-card">
+            <span class="eyebrow"><?php echo htmlspecialchars(t('scheduled_count_label')); ?></span>
+            <span class="stat-value"><?php echo $scheduledCount; ?></span>
+            <span class="stat-label"><?php echo htmlspecialchars(t('remind_label')); ?></span>
+        </div>
+        <div class="card-panel stat-card">
+            <span class="eyebrow"><?php echo htmlspecialchars(t('recurring_count_label')); ?></span>
+            <span class="stat-value"><?php echo $recurringCount; ?></span>
+            <span class="stat-label"><?php echo htmlspecialchars(t('repeat_scheduler')); ?></span>
+        </div>
+    </section>
+
+    <div class="workspace-grid">
+        <aside class="composer-column">
+            <section class="card-panel composer-panel">
+                <div class="panel-head">
+                    <div>
+                        <h2><?php echo htmlspecialchars($edit !== null ? t('edit_memo') : t('add_memo')); ?></h2>
+                        <p class="panel-subtitle"><?php echo htmlspecialchars(t('workspace_subtitle')); ?></p>
+                    </div>
+
+                    <?php if ($edit !== null) { ?>
+                        <a class="btn btn-secondary btn-small" href="index.php"><?php echo htmlspecialchars(t('cancel')); ?></a>
+                    <?php } ?>
+                </div>
+
+                <form class="stack-form" method="post" data-repeat-form novalidate>
+                    <?php echo Csrf::field(); ?>
+                    <?php if ($edit !== null) { ?>
+                        <input type="hidden" name="action" value="edit">
+                        <input type="hidden" name="id" value="<?php echo (int) $edit['id']; ?>">
+                    <?php } else { ?>
+                        <input type="hidden" name="action" value="add">
+                    <?php } ?>
+
+                    <label class="field" for="memo-title">
+                        <span class="field__label"><?php echo htmlspecialchars(t('title')); ?></span>
+                        <input
+                            id="memo-title"
+                            type="text"
+                            name="title"
+                            value="<?php echo htmlspecialchars((string) ($edit['title'] ?? '')); ?>"
+                            placeholder="<?php echo htmlspecialchars(t('title')); ?>"
+                        >
+                    </label>
+
+                    <label class="field" for="memo-content">
+                        <span class="field__label"><?php echo htmlspecialchars(t('content')); ?></span>
+                        <textarea id="memo-content" name="content" placeholder="<?php echo htmlspecialchars(t('content')); ?>"><?php echo htmlspecialchars((string) ($edit['content'] ?? '')); ?></textarea>
+                    </label>
+
+                    <label class="field" for="memo-remind">
+                        <span class="field__label"><?php echo htmlspecialchars(t('remind_label')); ?></span>
+                        <input
+                            id="memo-remind"
+                            type="datetime-local"
+                            name="remind_at"
+                            value="<?php echo htmlspecialchars(Reminder::formatReminderForInput($edit['remind_at'] ?? '')); ?>"
+                        >
+                    </label>
+
+                    <div class="repeat-card">
+                        <span class="stack-note"><?php echo htmlspecialchars(t('repeat_scheduler')); ?></span>
+
+                        <label class="field" for="repeat-mode">
+                            <span class="field__label"><?php echo htmlspecialchars(t('repeat_pattern')); ?></span>
+                            <select id="repeat-mode" name="repeat_mode" data-repeat-mode>
+                                <?php foreach ($repeatModeOptions as $value => $label) { ?>
+                                    <option value="<?php echo htmlspecialchars($value); ?>" <?php echo $editPattern['mode'] === $value ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($label); ?>
+                                    </option>
+                                <?php } ?>
+                            </select>
+                        </label>
+
+                        <p class="repeat-help" data-repeat-hint><?php echo htmlspecialchars($repeatHints[$editPattern['mode']] ?? $repeatHints['none']); ?></p>
+
+                        <div class="repeat-panel" data-repeat-panel="interval">
+                            <label class="field">
+                                <span class="field__label"><?php echo htmlspecialchars(t('repeat_every')); ?></span>
+                                <div class="interval-row">
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="999"
+                                        name="repeat_interval_value"
+                                        value="<?php echo $edit !== null ? $editIntervalValue : 1; ?>"
+                                        data-repeat-input
+                                    >
+                                    <select name="repeat_interval_unit" data-repeat-input>
+                                        <?php foreach ($intervalUnitOptions as $value => $label) { ?>
+                                            <?php $selectedUnit = $edit !== null ? $editIntervalUnit : 'hour'; ?>
+                                            <option value="<?php echo htmlspecialchars($value); ?>" <?php echo $selectedUnit === $value ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($label); ?>
+                                            </option>
+                                        <?php } ?>
+                                    </select>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div class="repeat-panel" data-repeat-panel="weekly_days">
+                            <span class="field__label"><?php echo htmlspecialchars(t('choose_weekdays')); ?></span>
+                            <div class="chip-grid weekday-grid">
+                                <?php foreach ($weekdayLabels as $weekdayValue => $weekdayLabel) { ?>
+                                    <label class="chip">
+                                        <input
+                                            type="checkbox"
+                                            name="repeat_weekdays[]"
+                                            value="<?php echo $weekdayValue; ?>"
+                                            <?php echo in_array($weekdayValue, $editWeekdays, true) ? 'checked' : ''; ?>
+                                            data-repeat-input
+                                        >
+                                        <span><?php echo htmlspecialchars($weekdayLabel); ?></span>
+                                    </label>
+                                <?php } ?>
+                            </div>
+                        </div>
+
+                        <div class="repeat-panel" data-repeat-panel="monthly_dates">
+                            <span class="field__label"><?php echo htmlspecialchars(t('choose_monthdays')); ?></span>
+                            <div class="chip-grid monthday-grid">
+                                <?php for ($day = 1; $day <= 31; $day++) { ?>
+                                    <label class="chip">
+                                        <input
+                                            type="checkbox"
+                                            name="repeat_monthdays[]"
+                                            value="<?php echo $day; ?>"
+                                            <?php echo in_array($day, $editMonthdays, true) ? 'checked' : ''; ?>
+                                            data-repeat-input
+                                        >
+                                        <span><?php echo $day; ?></span>
+                                    </label>
+                                <?php } ?>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <?php echo htmlspecialchars($edit !== null ? t('update') : t('save')); ?>
+                        </button>
+
+                        <?php if ($edit !== null) { ?>
+                            <a class="text-link" href="index.php"><?php echo htmlspecialchars(t('cancel')); ?></a>
+                        <?php } ?>
+                    </div>
+                </form>
+            </section>
+
+            <section class="card-panel notice-panel" data-notification-panel hidden>
+                <div class="panel-head">
+                    <div>
+                        <h2><?php echo htmlspecialchars(t('reminder_notification_title')); ?></h2>
+                        <p class="panel-subtitle"><?php echo htmlspecialchars(t('repeat_scheduler')); ?></p>
+                    </div>
+                </div>
+                <p class="notice-copy" data-notification-copy></p>
+                <button type="button" class="btn btn-secondary" data-enable-notifications><?php echo htmlspecialchars(t('enable_notifications')); ?></button>
+            </section>
+        </aside>
+
+        <main class="memo-column">
+            <section class="card-panel list-panel">
+                <div class="panel-head">
+                    <div>
+                        <h2><?php echo htmlspecialchars(t('memo_list_title')); ?></h2>
+                        <p class="panel-subtitle"><?php echo htmlspecialchars(t('memo_list_subtitle')); ?></p>
+                    </div>
+                </div>
+
+                <?php if ($memoList === []) { ?>
+                    <div class="empty-state">
+                        <strong><?php echo htmlspecialchars(t('no_memos')); ?></strong>
+                        <p><?php echo htmlspecialchars(t('workspace_subtitle')); ?></p>
+                    </div>
+                <?php } else { ?>
+                    <div class="memo-grid">
+                        <?php foreach ($memoList as $memo) { ?>
+                            <?php
+                            $memoRemindAt = Reminder::formatReminderForInput($memo['remind_at'] ?? '');
+                            $memoPattern = Reminder::normalizeStoredRepeatPattern((string) ($memo['repeat_mode'] ?? 'none'), $memo['repeat_config'] ?? '', $memoRemindAt);
+                            $memoRepeatMode = $memoPattern['mode'];
+                            $memoRepeatLabel = RepeatLabel::describe($tr, $memoRepeatMode, $memoPattern['config']);
+                            $memoContent = trim((string) ($memo['content'] ?? ''));
+                            ?>
+                            <article class="memo-card">
+                                <div class="memo-card__head">
+                                    <div>
+                                        <h3><?php echo htmlspecialchars((string) $memo['title']); ?></h3>
+                                        <p class="memo-card__body<?php echo $memoContent === '' ? ' memo-card__body--muted' : ''; ?>">
+                                            <?php echo $memoContent === '' ? htmlspecialchars(t('empty_content')) : nl2br(htmlspecialchars($memoContent)); ?>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="memo-meta">
+                                    <?php if ($memoRemindAt !== '') { ?>
+                                        <span
+                                            class="meta-pill reminder-pill"
+                                            data-id="<?php echo (int) $memo['id']; ?>"
+                                            data-remind="<?php echo htmlspecialchars($memoRemindAt); ?>"
+                                            data-repeat-mode="<?php echo htmlspecialchars($memoRepeatMode); ?>"
+                                            data-repeat-label="<?php echo htmlspecialchars($memoRepeatLabel); ?>"
+                                            data-title="<?php echo htmlspecialchars((string) $memo['title']); ?>"
+                                        >
+                                            <?php echo htmlspecialchars(RepeatLabel::summaryText($tr, $memoRemindAt, $memoRepeatLabel)); ?>
+                                        </span>
+                                        <span class="meta-pill repeat-pill" data-repeat-badge <?php echo $memoRepeatMode === 'none' ? 'hidden' : ''; ?>>
+                                            <?php echo htmlspecialchars($memoRepeatLabel); ?>
+                                        </span>
+                                    <?php } ?>
+
+                                    <span class="meta-date"><?php echo htmlspecialchars((string) $memo['created_at']); ?></span>
+                                </div>
+
+                                <div class="memo-actions">
+                                    <a class="btn btn-ghost btn-small" href="index.php?edit=<?php echo (int) $memo['id']; ?>"><?php echo htmlspecialchars(t('edit')); ?></a>
+
+                                    <form class="inline-form" method="post">
+                                        <?php echo Csrf::field(); ?>
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="id" value="<?php echo (int) $memo['id']; ?>">
+                                        <button
+                                            type="button"
+                                            class="btn btn-danger btn-small"
+                                            data-original-label="<?php echo htmlspecialchars(t('delete')); ?>"
+                                            onclick="confirmDelete(this)"
+                                        >
+                                            <?php echo htmlspecialchars(t('delete')); ?>
+                                        </button>
+                                    </form>
+                                </div>
+                            </article>
+                        <?php } ?>
+                    </div>
+                <?php } ?>
+            </section>
+        </main>
+    </div>
 </div>
+<div class="toast-stack" data-toast-stack aria-live="polite" aria-atomic="true"></div>
 <script>
-function confirmDelete(button) {
-    if (button.dataset.armed !== '1') {
-        button.dataset.armed = '1';
-        button.dataset.original = button.innerText;
-        button.innerText = <?php echo json_encode(t('sure'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
-    } else {
-        button.form.submit();
-    }
-}
-
-if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
-}
-
-var alreadyNotified = [];
-var repeatHints = <?php echo json_encode($repeatHints, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
-var jsLang = <?php echo json_encode([
-    'setReminderFirst' => t('hint_reminder_first'),
-    'notificationTitle' => t('reminder_notification_title'),
-    'alertPrefix' => t('reminder_alert_prefix'),
-    'rescheduleError' => t('reschedule_error'),
+window.memoAppConfig = <?php echo json_encode([
+    'csrfToken' => App\Csrf::token(),
+    'repeatHints' => $repeatHints,
+    'text' => [
+        'setReminderFirst' => t('hint_reminder_first'),
+        'notificationTitle' => t('reminder_notification_title'),
+        'alertPrefix' => t('reminder_alert_prefix'),
+        'rescheduleError' => t('reschedule_error'),
+        'notificationsDefault' => t('notifications_default'),
+        'notificationsDenied' => t('notifications_denied'),
+        'notificationsUnavailable' => t('notifications_unavailable'),
+        'confirmDelete' => t('sure'),
+        'deleteLabel' => t('delete'),
+    ],
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
-
-function formatReminderText(remindAt, repeatLabel) {
-    return '\u23F0 ' + remindAt.replace('T', ' ') + (repeatLabel ? ' | ' + repeatLabel : '');
-}
-
-function updateReminderElement(item, remindAt, repeatMode, repeatLabel) {
-    item.setAttribute('data-remind', remindAt);
-    item.setAttribute('data-repeat-mode', repeatMode);
-    item.setAttribute('data-repeat-label', repeatLabel || '');
-    item.textContent = formatReminderText(remindAt, repeatLabel || '');
-}
-
-function rescheduleReminder(item) {
-    var memoId = item.getAttribute('data-id');
-    var repeatMode = item.getAttribute('data-repeat-mode') || 'none';
-
-    if (!memoId || repeatMode === 'none') {
-        return;
-    }
-
-    fetch('index.php', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-        },
-        body: new URLSearchParams({
-            action: 'reschedule',
-            id: memoId
-        })
-    })
-        .then(function (response) {
-            return response.json();
-        })
-        .then(function (data) {
-            if (!data || !data.success || !data.remind_at) {
-                return;
-            }
-
-            updateReminderElement(item, data.remind_at, data.repeat_mode || repeatMode, data.repeat_label || '');
-        })
-        .catch(function (error) {
-            console.error(jsLang.rescheduleError, error);
-        });
-}
-
-function toggleRepeatOptions(form) {
-    var modeInput = form.querySelector('[data-repeat-mode]');
-    var remindInput = form.querySelector('[name="remind_at"]');
-    var hint = form.querySelector('[data-repeat-hint]');
-    var mode = modeInput ? modeInput.value : 'none';
-    var hasReminder = remindInput && remindInput.value !== '';
-
-    form.querySelectorAll('[data-repeat-panel]').forEach(function (panel) {
-        var isActive = panel.getAttribute('data-repeat-panel') === mode;
-        panel.style.display = isActive ? 'block' : 'none';
-
-        panel.querySelectorAll('[data-repeat-input]').forEach(function (input) {
-            input.disabled = !isActive;
-        });
-    });
-
-    if (hint) {
-        if (!hasReminder && mode !== 'none') {
-            hint.textContent = jsLang.setReminderFirst;
-        } else {
-            hint.textContent = repeatHints[mode] || repeatHints.none;
-        }
-    }
-}
-
-document.querySelectorAll('[data-repeat-form]').forEach(function (form) {
-    var modeInput = form.querySelector('[data-repeat-mode]');
-    var remindInput = form.querySelector('[name="remind_at"]');
-
-    if (modeInput) {
-        modeInput.addEventListener('change', function () {
-            toggleRepeatOptions(form);
-        });
-    }
-
-    if (remindInput) {
-        remindInput.addEventListener('input', function () {
-            toggleRepeatOptions(form);
-        });
-    }
-
-    toggleRepeatOptions(form);
-});
-
-function checkReminders() {
-    var now = new Date();
-    var items = document.querySelectorAll('.remind');
-
-    items.forEach(function (item) {
-        var memoId = item.getAttribute('data-id');
-        var remindAt = item.getAttribute('data-remind');
-        var repeatMode = item.getAttribute('data-repeat-mode') || 'none';
-        var title = item.getAttribute('data-title');
-
-        if (!remindAt) {
-            return;
-        }
-
-        var remindTime = new Date(remindAt);
-        var notifyKey = memoId + ':' + remindAt;
-
-        if (now >= remindTime && alreadyNotified.indexOf(notifyKey) === -1) {
-            alreadyNotified.push(notifyKey);
-
-            if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification(jsLang.notificationTitle, { body: title });
-            } else {
-                alert(jsLang.alertPrefix + ' ' + title);
-            }
-
-            if (repeatMode !== 'none') {
-                rescheduleReminder(item);
-            }
-        }
-    });
-}
-
-setInterval(checkReminders, 10000);
-checkReminders();
 </script>
+<script src="memo-ui.js"></script>
 </body>
 </html>

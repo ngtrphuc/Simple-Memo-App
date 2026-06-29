@@ -1,6 +1,11 @@
 <?php
+
+declare(strict_types=1);
+
 require 'db.php';
 require 'lang.php';
+
+use App\Csrf;
 
 $action = $_GET['action'] ?? 'login';
 $oldUsername = '';
@@ -26,12 +31,16 @@ if (isset($_SESSION['user_id'])) {
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? '';
+    Csrf::check();
+
+    $username = trim((string) ($_POST['username'] ?? ''));
+    $password = (string) ($_POST['password'] ?? '');
     $oldUsername = $username;
 
     if ($username === '' || $password === '') {
         $error = t('err_fill_all');
+    } elseif (! preg_match('/^[a-zA-Z0-9_]{3,32}$/', $username)) {
+        $error = t('err_invalid_username');
     } elseif ($action === 'register') {
         $stmt = $db->prepare('SELECT id FROM users WHERE username = ?');
         $stmt->execute([$username]);
@@ -42,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hash = password_hash($password, PASSWORD_DEFAULT);
             $stmt = $db->prepare('INSERT INTO users (username, password) VALUES (?, ?)');
             $stmt->execute([$username, $hash]);
+            session_regenerate_id(true);
             $_SESSION['user_id'] = $db->lastInsertId();
             $_SESSION['username'] = $username;
             header('Location: index.php');
@@ -70,6 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($ok) {
+            session_regenerate_id(true);
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $user['username'];
             header('Location: index.php');
@@ -87,95 +98,71 @@ $isRegister = $action === 'register';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $isRegister ? t('register') : t('login'); ?></title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f4f5f7;
-            padding: 60px 15px;
-        }
-
-        .box {
-            max-width: 340px;
-            margin: 0 auto;
-            background: #fff;
-            border: 1px solid #e3e3e3;
-            border-radius: 8px;
-            padding: 20px;
-        }
-
-        h2 {
-            margin-top: 0;
-        }
-
-        input {
-            width: 100%;
-            box-sizing: border-box;
-            padding: 9px;
-            margin-bottom: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-
-        button {
-            width: 100%;
-            padding: 10px;
-            border: 0;
-            border-radius: 5px;
-            background: #2d6cdf;
-            color: #fff;
-            cursor: pointer;
-        }
-
-        .error {
-            background: #fdecea;
-            color: #b3261e;
-            padding: 9px;
-            border-radius: 5px;
-            margin-bottom: 12px;
-        }
-
-        a {
-            color: #2d6cdf;
-            display: block;
-            text-align: center;
-            margin-top: 14px;
-            text-decoration: none;
-        }
-
-        .lang-select {
-            width: auto;
-            display: inline-block;
-            padding: 5px 8px;
-            margin: 0;
-            font-size: 13px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            background: #fff;
-            cursor: pointer;
-        }
-    </style>
+    <title><?php echo htmlspecialchars(t('app_title') . ' | ' . ($isRegister ? t('register') : t('login'))); ?></title>
+    <link rel="stylesheet" href="app.css">
 </head>
-<body>
-    <div class="box">
-        <div style="text-align:right;margin-bottom:12px;"><?php echo langSelect(); ?></div>
-        <h2><?php echo $isRegister ? t('register') : t('login'); ?></h2>
+<body class="auth-page">
+    <main class="auth-shell">
+        <section class="auth-brand card-panel">
+            <div>
+                <span class="eyebrow"><?php echo htmlspecialchars(t('app_title')); ?></span>
+                <h1><?php echo htmlspecialchars(t('auth_tagline')); ?></h1>
+                <p class="lead"><?php echo htmlspecialchars(t('auth_hint')); ?></p>
+            </div>
 
-        <?php if ($error) { ?>
-            <div class="error"><?php echo htmlspecialchars($error); ?></div>
-        <?php } ?>
+            <ul class="feature-list">
+                <li><?php echo htmlspecialchars(t('feature_secure')); ?></li>
+                <li><?php echo htmlspecialchars(t('feature_repeat')); ?></li>
+                <li><?php echo htmlspecialchars(t('feature_local')); ?></li>
+            </ul>
+        </section>
 
-        <form method="post">
-            <input type="text" name="username" placeholder="<?php echo t('username'); ?>" value="<?php echo htmlspecialchars($oldUsername); ?>">
-            <input type="password" name="password" placeholder="<?php echo t('password'); ?>">
-            <button type="submit"><?php echo $isRegister ? t('create_account') : t('login'); ?></button>
-        </form>
+        <section class="auth-panel card-panel">
+            <div class="auth-toolbar"><?php echo langSelect(); ?></div>
+            <h2><?php echo htmlspecialchars($isRegister ? t('register') : t('login')); ?></h2>
+            <p class="lead"><?php echo htmlspecialchars(t('auth_hint')); ?></p>
 
-        <?php if ($isRegister) { ?>
-            <a href="auth.php"><?php echo t('have_account'); ?></a>
-        <?php } else { ?>
-            <a href="auth.php?action=register"><?php echo t('no_account'); ?></a>
-        <?php } ?>
-    </div>
+            <?php if ($error) { ?>
+                <div class="error-banner"><?php echo htmlspecialchars($error); ?></div>
+            <?php } ?>
+
+            <form class="stack-form" method="post" novalidate>
+                <?php echo Csrf::field(); ?>
+
+                <label class="field" for="username">
+                    <span class="field__label"><?php echo htmlspecialchars(t('username')); ?></span>
+                    <input
+                        id="username"
+                        type="text"
+                        name="username"
+                        autocomplete="username"
+                        placeholder="<?php echo htmlspecialchars(t('username')); ?>"
+                        value="<?php echo htmlspecialchars($oldUsername); ?>"
+                    >
+                </label>
+
+                <label class="field" for="password">
+                    <span class="field__label"><?php echo htmlspecialchars(t('password')); ?></span>
+                    <input
+                        id="password"
+                        type="password"
+                        name="password"
+                        autocomplete="<?php echo $isRegister ? 'new-password' : 'current-password'; ?>"
+                        placeholder="<?php echo htmlspecialchars(t('password')); ?>"
+                    >
+                </label>
+
+                <button type="submit" class="btn btn-primary btn-block"><?php echo htmlspecialchars($isRegister ? t('create_account') : t('login')); ?></button>
+            </form>
+
+            <div class="auth-switch">
+                <?php if ($isRegister) { ?>
+                    <a class="text-link" href="auth.php"><?php echo htmlspecialchars(t('have_account')); ?></a>
+                <?php } else { ?>
+                    <a class="text-link" href="auth.php?action=register"><?php echo htmlspecialchars(t('no_account')); ?></a>
+                <?php } ?>
+            </div>
+        </section>
+    </main>
 </body>
 </html>

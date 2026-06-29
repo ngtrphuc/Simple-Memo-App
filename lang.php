@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 $availableLangs = ['en', 'ja', 'vi'];
 
 if (isset($_GET['lang']) && in_array($_GET['lang'], $availableLangs, true)) {
@@ -36,6 +38,7 @@ $translations = [
         'err_fill_all' => 'Please fill in all fields.',
         'err_user_exists' => 'Username already exists.',
         'err_wrong_login' => 'Wrong username or password.',
+        'err_invalid_username' => 'Username must be 3-32 characters: letters, numbers, or underscore.',
 
         'edit_memo' => 'Edit memo',
         'add_memo' => 'Add new memo',
@@ -85,10 +88,10 @@ $translations = [
         'hint_weekly' => 'Repeats every week on the same weekday and time.',
         'hint_monthly' => 'Repeats every month on the same date and time.',
         'hint_yearly' => 'Repeats every year on the same date and time.',
-        'hint_interval' => 'Choose an exact interval such as every 15 minutes or every 2 hours.',
-        'hint_weekly_days' => 'Pick one or more weekdays. The time stays the same as the reminder time above.',
-        'hint_monthly_dates' => 'Pick one or more dates in the month. The time stays the same as the reminder time above.',
-        'hint_reminder_first' => 'Set a reminder time first. The repeat settings will be saved and start from that time.',
+        'hint_interval' => 'Pick an exact gap such as every 15 minutes or every 2 hours.',
+        'hint_weekly_days' => 'Pick one or more weekdays. The time stays the same as the reminder above.',
+        'hint_monthly_dates' => 'Pick one or more dates in the month. The time stays the same as the reminder above.',
+        'hint_reminder_first' => 'Set the reminder time first. The repeat setting will be saved and start from that point.',
 
         'lbl_every' => 'Every',
         'lbl_every_day' => 'Every day',
@@ -98,26 +101,44 @@ $translations = [
         'lbl_weekly_pattern' => 'Weekly pattern',
         'lbl_monthly_on' => 'Monthly on',
         'lbl_monthly_pattern' => 'Monthly pattern',
+        'auth_tagline' => 'Capture quick thoughts and keep every reminder in one calm workspace.',
+        'auth_hint' => 'Sign in to manage personal memos, repeat schedules, and reminder timing without the clutter.',
+        'feature_secure' => 'Private account access with CSRF protection',
+        'feature_repeat' => 'Flexible repeat scheduling for recurring reminders',
+        'feature_local' => 'Local SQLite storage that stays lightweight',
+        'workspace_heading' => 'Your memo workspace',
+        'workspace_subtitle' => 'A focused desk for notes, schedules, and follow-ups that need your attention.',
+        'memo_count_label' => 'Memos',
+        'scheduled_count_label' => 'Scheduled',
+        'recurring_count_label' => 'Recurring',
+        'memo_list_title' => 'Saved memos',
+        'memo_list_subtitle' => 'Review details, adjust reminder timing, or jump back into an edit without losing context.',
+        'enable_notifications' => 'Enable notifications',
+        'notifications_default' => 'Turn on browser notifications to receive reminder popups while this page stays open.',
+        'notifications_denied' => 'Browser notifications are blocked. In-page reminder toasts will still appear here.',
+        'notifications_unavailable' => 'This browser cannot show desktop notifications. In-page reminder toasts will still work.',
+        'empty_content' => 'No extra details for this memo yet.',
     ],
     'ja' => [
         'app_title' => 'メモアプリ',
         'hello' => 'こんにちは',
         'logout' => 'ログアウト',
         'lang_label' => '言語',
-        'reminder_notification_title' => 'メモの通知',
+        'reminder_notification_title' => 'メモのリマインダー',
         'reminder_alert_prefix' => 'リマインダー:',
-        'reschedule_error' => 'リマインダーの再スケジュールに失敗しました',
+        'reschedule_error' => 'リマインダーの再設定に失敗しました',
 
         'login' => 'ログイン',
-        'register' => '新規登録',
+        'register' => '登録',
         'username' => 'ユーザー名',
         'password' => 'パスワード',
         'create_account' => 'アカウント作成',
-        'have_account' => 'すでにアカウントをお持ちですか？ログイン',
-        'no_account' => 'アカウントをお持ちでないですか？新規登録',
+        'have_account' => 'すでにアカウントをお持ちですか？ ログイン',
+        'no_account' => 'アカウントがありませんか？ 登録',
         'err_fill_all' => 'すべての項目を入力してください。',
-        'err_user_exists' => 'このユーザー名は既に使われています。',
+        'err_user_exists' => 'このユーザー名はすでに使われています。',
         'err_wrong_login' => 'ユーザー名またはパスワードが違います。',
+        'err_invalid_username' => 'ユーザー名は3〜32文字の英数字またはアンダースコアにしてください。',
 
         'edit_memo' => 'メモを編集',
         'add_memo' => '新しいメモを追加',
@@ -128,13 +149,13 @@ $translations = [
         'cancel' => 'キャンセル',
         'edit' => '編集',
         'delete' => '削除',
-        'sure' => '本当に削除しますか？',
+        'sure' => '本当に？',
         'no_memos' => 'まだメモがありません。',
 
-        'remind_label' => 'リマインド日時（任意）',
+        'remind_label' => 'リマインド時刻（任意）',
         'repeat_scheduler' => '柔軟な繰り返し設定',
         'repeat_pattern' => '繰り返しパターン',
-        'repeat_every' => '次の間隔で繰り返す',
+        'repeat_every' => '繰り返し間隔',
         'choose_weekdays' => '曜日を選択',
         'choose_monthdays' => '月の日付を選択',
 
@@ -143,9 +164,9 @@ $translations = [
         'repeat_weekly' => '毎週',
         'repeat_monthly' => '毎月',
         'repeat_yearly' => '毎年',
-        'repeat_interval' => '何分・何時間・何日ごと',
+        'repeat_interval' => '数分／数時間／数日ごと',
         'repeat_weekly_days' => '曜日を選ぶ',
-        'repeat_monthly_dates' => '日付を選ぶ',
+        'repeat_monthly_dates' => '月の日付を選ぶ',
 
         'unit_minute' => '分',
         'unit_hour' => '時間',
@@ -163,31 +184,31 @@ $translations = [
         'wd_sat' => '土',
 
         'hint_none' => '1回だけ通知します。',
-        'hint_daily' => '同じ時間に毎日繰り返します。',
-        'hint_weekly' => '同じ曜日と時間に毎週繰り返します。',
-        'hint_monthly' => '同じ日付と時間に毎月繰り返します。',
-        'hint_yearly' => '同じ日付と時間に毎年繰り返します。',
+        'hint_daily' => '毎日同じ時刻に繰り返します。',
+        'hint_weekly' => '毎週同じ曜日・同じ時刻に繰り返します。',
+        'hint_monthly' => '毎月同じ日・同じ時刻に繰り返します。',
+        'hint_yearly' => '毎年同じ日・同じ時刻に繰り返します。',
         'hint_interval' => '15分ごとや2時間ごとなど、正確な間隔を選べます。',
-        'hint_weekly_days' => '1つ以上の曜日を選択してください。時刻は上のリマインド日時と同じです。',
-        'hint_monthly_dates' => '1つ以上の日付を選択してください。時刻は上のリマインド日時と同じです。',
-        'hint_reminder_first' => '先にリマインド日時を設定してください。繰り返し設定は保存され、その日時から開始されます。',
+        'hint_weekly_days' => '1つ以上の曜日を選びます。時刻は上のリマインダーと同じです。',
+        'hint_monthly_dates' => '1つ以上の日付を選びます。時刻は上のリマインダーと同じです。',
+        'hint_reminder_first' => '先にリマインド時刻を設定してください。繰り返し設定はその時点から始まります。',
 
         'lbl_every' => '毎',
         'lbl_every_day' => '毎日',
         'lbl_every_week' => '毎週',
         'lbl_every_month' => '毎月',
         'lbl_every_year' => '毎年',
-        'lbl_weekly_pattern' => '毎週パターン',
+        'lbl_weekly_pattern' => '週単位の繰り返し',
         'lbl_monthly_on' => '毎月',
-        'lbl_monthly_pattern' => '毎月パターン',
+        'lbl_monthly_pattern' => '月単位の繰り返し',
     ],
     'vi' => [
-        'app_title' => 'Ứng dụng Ghi chú',
+        'app_title' => 'Ứng dụng ghi chú',
         'hello' => 'Xin chào',
         'logout' => 'Đăng xuất',
         'lang_label' => 'Ngôn ngữ',
-        'reminder_notification_title' => 'Nhắc ghi chú',
-        'reminder_alert_prefix' => 'Nhắc:',
+        'reminder_notification_title' => 'Nhắc nhở ghi chú',
+        'reminder_alert_prefix' => 'Nhắc nhở:',
         'reschedule_error' => 'Không thể đặt lại lịch nhắc',
 
         'login' => 'Đăng nhập',
@@ -200,6 +221,7 @@ $translations = [
         'err_fill_all' => 'Vui lòng điền đầy đủ thông tin.',
         'err_user_exists' => 'Tên đăng nhập đã tồn tại.',
         'err_wrong_login' => 'Sai tên đăng nhập hoặc mật khẩu.',
+        'err_invalid_username' => 'Tên đăng nhập phải dài 3-32 ký tự: chữ, số hoặc dấu gạch dưới.',
 
         'edit_memo' => 'Sửa ghi chú',
         'add_memo' => 'Thêm ghi chú mới',
@@ -270,8 +292,10 @@ $T = $translations[$lang];
 function t(string $key): string
 {
     global $T;
+    global $translations;
+    global $lang;
 
-    return $T[$key] ?? $key;
+    return $T[$key] ?? $translations[$lang][$key] ?? $translations['en'][$key] ?? $key;
 }
 
 function currentLang(): string

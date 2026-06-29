@@ -10,79 +10,67 @@ It is the working reference for future changes in this memo app.
 ## Current Memo App Shape
 
 - Lightweight PHP app, not Laravel.
-- Main entry files are `auth.php`, `db.php`, `index.php`, and `lang.php`.
-- Persistence uses `PDO` with local `SQLite`.
-- Authentication uses PHP sessions and per-user memo ownership checks in SQL queries.
-- UI, request handling, domain logic, and rendering are still mostly co-located in single files.
+- Entry files: `auth.php`, `db.php`, `index.php`, `lang.php`.
+- Domain logic now lives in `src/` (PSR-4 `App\`): `Reminder`, `RepeatLabel`, `Csrf`,
+  `MemoRepository`.
+- Persistence uses `PDO` with local `SQLite`, behind `MemoRepository`.
+- Authentication uses PHP sessions with CSRF protection and session-id regeneration on
+  login, and per-user memo ownership checks enforced in SQL.
 
-## What We Reuse From Laravel-Lab
+## What We Reused From Laravel-Lab
 
 ### Architecture
-
-- Favor a clear separation between request handling, domain logic, persistence, and rendering.
-- Keep routes/controllers thin. In this repo that means moving business logic out of page files over time.
-- Validate input before mutating data.
-- Keep user ownership checks on the server side, never only in the UI.
+- Separation between request handling, domain logic, persistence, and rendering — applied
+  by moving reminder math to `Reminder`, labels to `RepeatLabel`, and SQL to
+  `MemoRepository`, leaving `index.php` as a thin handler.
+- Validate input before mutating data (username regex, repeat-pattern normalization).
+- Keep user ownership checks server-side.
 
 ### Tooling
+- `strict_types=1` everywhere.
+- `PHPStan` (generic, level max), `Pint` (PSR-12), `Rector` (PHP sets, no Laravel) as the
+  quality toolchain. **Larastan / rector-laravel deliberately NOT used** — this is plain PHP.
+- Tests added before/with the refactor, around reminder scheduling and CSRF.
+- `SQLite` for low-friction local dev and tests.
 
-- Keep `strict_types=1`.
-- Use `PHPStan`, `Pint`, and `Rector` as the default quality toolchain.
-- Add tests before large refactors, especially around auth and reminder scheduling.
-- Prefer `SQLite` for low-friction local development and test fixtures.
+## What We Reused From Skill-Factory
 
-### Practical Migration Direction
+### Backend
+- Thin handlers, business rules in classes, no persistence/domain logic in view templates.
+- Small focused modules over one procedural file.
+- No user-data caching introduced (no clear invalidation need yet).
 
-When evolving this app, prefer this extraction path instead of a full rewrite:
+### Security
+- No frontend-only ownership checks.
+- No logging of passwords or session identifiers.
+- Session id regenerated on successful login (DONE).
+- CSRF protection added across all write actions, including the reschedule AJAX (DONE).
 
-1. Create `src/` with PSR-4 autoloading in `composer.json`.
-2. Extract reminder calculations into a dedicated service.
-3. Extract memo CRUD into a repository class around `PDO`.
-4. Extract auth/session operations into an auth service.
-5. Move repeated HTML into partials/templates.
-6. Add tests around the extracted services before deeper structural changes.
+### Testing
+- Lightest layer that proves behavior: pure reminder/repeat logic unit-tested first (DONE).
+- DB-backed integration tests for auth/CRUD remain a possible follow-up.
 
-## What We Reuse From Skill-Factory
+### Dependencies
+- Stack docs kept truthful to the real repo.
+- No framework-specific tooling carried in.
 
-### Backend Rules
+## Migration Roadmap Status
 
-- Keep handlers thin and push business rules into services.
-- Do not put persistence decisions and domain logic directly in view templates.
-- Prefer small, focused modules over one growing procedural file.
-- Avoid introducing user-data caching unless there is a clear invalidation strategy.
+Original extraction path and where it now stands:
 
-### Security Rules
-
-- Never trust frontend-only checks for memo ownership.
-- Do not log passwords, raw session identifiers, or other secrets.
-- Regenerate session identifiers on successful login in future auth hardening work.
-- Add CSRF protection before expanding write actions further.
-
-### Testing Rules
-
-- Use the lightest test layer that proves behavior.
-- Unit test pure reminder/repeat logic first.
-- Add integration tests for auth and SQLite-backed memo CRUD flows.
-- Do not depend on ad hoc manual seed state for tests; create minimal fixtures per test.
-
-### Dependency Rules
-
-- Keep the documented stack truthful to the actual repo.
-- Do not carry framework-specific tooling/config that the app does not really use.
-- If the app stays plain PHP, prefer generic `PHPStan` config over Laravel-only analysis paths.
-
-## Immediate Implications For This Repo
-
-- `index.php` currently mixes HTTP handling, reminder domain rules, HTML, CSS, and JavaScript.
-- `auth.php` handles login/register/logout correctly at a basic level, but should later add session ID regeneration and CSRF protection.
-- `db.php` is acting as both bootstrap and migration layer; that is acceptable for now, but schema evolution should become more explicit once the app grows.
-- `phpstan.larastan.neon` is reference material from Laravel-oriented tooling and should not be treated as the primary analysis config unless this repo becomes Laravel-based.
+1. Create `src/` with PSR-4 autoloading — DONE
+2. Extract reminder calculations into a dedicated service — DONE (`Reminder` + `RepeatLabel`)
+3. Extract memo CRUD into a repository around `PDO` — DONE (`MemoRepository`)
+4. Extract auth/session operations into an auth service — PARTIAL (CSRF + session hardening
+   added in `auth.php`; not yet a standalone `AuthService` class)
+5. Move repeated HTML into partials/templates — NOT DONE (HTML still inline in `index.php`
+   and `auth.php`)
+6. Add tests around extracted services — DONE for reminder + CSRF; auth/CRUD integration
+   tests still open
 
 ## Working Standard Going Forward
 
-For future work on this memo app:
-
-- Keep the app lightweight unless there is a strong reason to migrate to Laravel.
-- Borrow Laravel-style structure and discipline without forcing Laravel itself into the project.
+- Keep the app lightweight; no Laravel unless there is a strong reason.
+- Borrow Laravel-style discipline without forcing the framework in.
 - Prefer incremental extraction and test coverage over big-bang rewrites.
-- Use the two reference repos as guidance for architecture, tooling, security, and maintainability decisions.
+- New domain logic goes in `src/` with a matching test; keep `index.php`/`auth.php` thin.

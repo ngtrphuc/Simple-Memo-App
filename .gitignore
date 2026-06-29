@@ -1,6 +1,6 @@
+/vendor/
+/node_modules/
 memo.sqlite
-memo.sqlite-*
-dist
-node_modules
-vendor
-storage/rector
+.phpunit.cache/
+.phpstan-cache/
+.php-cs-fixer.cache

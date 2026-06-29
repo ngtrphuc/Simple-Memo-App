@@ -1,9 +1,3 @@
 {
-    "preset": "laravel",
-    "rules": {
-        "declare_strict_types": true,
-        "ordered_imports": {
-            "sort_algorithm": "alpha"
-        }
-    }
+    "preset": "psr12"
 }
