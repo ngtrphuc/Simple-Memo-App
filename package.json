@@ -8,9 +8,9 @@
     "web": "php -S 127.0.0.1:32123"
   },
   "devDependencies": {
-    "electron": "^42.5.0"
+    "electron": "^42.5.1"
   },
   "allowScripts": {
-    "electron@42.5.0": true
+    "electron@42.5.1": true
   }
 }
