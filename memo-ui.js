@@ -28,7 +28,7 @@
         }
 
         button.dataset.armed = '0';
-        button.textContent = button.dataset.originalLabel || text.deleteLabel || 'Delete';
+        button.textContent = button.dataset.originalLabel || text.deleteLabel || '';
     }
 
     window.confirmDelete = function (button) {
@@ -45,7 +45,7 @@
         }
 
         button.dataset.armed = '1';
-        button.textContent = text.confirmDelete || 'Sure?';
+        button.textContent = text.confirmDelete || '';
 
         if (deleteTimers.has(button)) {
             window.clearTimeout(deleteTimers.get(button));
@@ -106,8 +106,8 @@
                 updateReminderElement(item, data.remind_at, data.repeat_mode || repeatMode, data.repeat_label || '');
             })
             .catch(function (error) {
-                console.error(text.rescheduleError || 'Failed to reschedule reminder', error);
-                showToast(text.rescheduleError || 'Failed to reschedule reminder', 'error');
+                console.error(text.rescheduleError || '', error);
+                showToast(text.rescheduleError || '', 'error');
             });
     }
 
@@ -208,7 +208,7 @@
             var memoId = item.getAttribute('data-id');
             var remindAt = item.getAttribute('data-remind');
             var repeatMode = item.getAttribute('data-repeat-mode') || 'none';
-            var title = item.getAttribute('data-title') || text.notificationTitle || 'Reminder';
+            var title = item.getAttribute('data-title') || text.notificationTitle || '';
 
             if (!memoId || !remindAt) {
                 return;
@@ -224,11 +224,11 @@
             alreadyNotified.add(notifyKey);
 
             if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification(text.notificationTitle || 'Memo reminder', {
+                new Notification(text.notificationTitle || '', {
                     body: title,
                 });
             } else {
-                showToast((text.alertPrefix || 'Reminder:') + ' ' + title);
+                showToast((text.alertPrefix || '') + ' ' + title);
             }
 
             if (repeatMode !== 'none') {
