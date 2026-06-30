@@ -7,7 +7,6 @@
         "php": "^8.3"
     },
     "require-dev": {
-        "barryvdh/laravel-debugbar": "*",
         "laravel/pint": "^1.18",
         "phpstan/phpstan": "^2.1",
         "phpunit/phpunit": "^11.5",
