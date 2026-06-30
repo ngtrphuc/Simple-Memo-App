@@ -16,6 +16,17 @@ use PDO;
  *
  * The repository owns persistence only. Repeat math lives in {@see Reminder};
  * the HTTP handler in index.php wires the two together.
+ *
+ * @phpstan-type MemoRow array{
+ *     id: int,
+ *     user_id: int,
+ *     title: string,
+ *     content: string,
+ *     remind_at: string,
+ *     repeat_mode: string,
+ *     repeat_config: string,
+ *     created_at: string
+ * }
  */
 final readonly class MemoRepository
 {
@@ -24,7 +35,7 @@ final readonly class MemoRepository
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * @return list<MemoRow>
      */
     public function allForUser(int $userId): array
     {
@@ -39,18 +50,14 @@ final readonly class MemoRepository
                 continue;
             }
 
-            $memo = [];
-            foreach ($row as $key => $value) {
-                $memo[(string) $key] = $value;
-            }
-            $result[] = $memo;
+            $result[] = $this->hydrateMemo($row);
         }
 
         return $result;
     }
 
     /**
-     * @return array<string, mixed>|null
+     * @return MemoRow|null
      */
     public function find(int $id, int $userId): ?array
     {
@@ -62,13 +69,7 @@ final readonly class MemoRepository
             return null;
         }
 
-        /** @var array<string, mixed> $result */
-        $result = [];
-        foreach ($row as $key => $value) {
-            $result[(string) $key] = $value;
-        }
-
-        return $result;
+        return $this->hydrateMemo($row);
     }
 
     public function create(
@@ -124,5 +125,41 @@ final readonly class MemoRepository
     {
         $stmt = $this->db->prepare('UPDATE memos SET remind_at = ? WHERE id = ? AND user_id = ?');
         $stmt->execute([$remindAt, $id, $userId]);
+    }
+
+    /**
+     * @param  array<string|int, mixed>  $row
+     * @return MemoRow
+     */
+    private function hydrateMemo(array $row): array
+    {
+        return [
+            'id' => $this->intValue($row['id'] ?? 0),
+            'user_id' => $this->intValue($row['user_id'] ?? 0),
+            'title' => $this->stringValue($row['title'] ?? ''),
+            'content' => $this->stringValue($row['content'] ?? ''),
+            'remind_at' => $this->stringValue($row['remind_at'] ?? ''),
+            'repeat_mode' => $this->stringValue($row['repeat_mode'] ?? 'none'),
+            'repeat_config' => $this->stringValue($row['repeat_config'] ?? ''),
+            'created_at' => $this->stringValue($row['created_at'] ?? ''),
+        ];
+    }
+
+    private function intValue(mixed $value): int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+
+        if (is_string($value) && is_numeric($value)) {
+            return (int) $value;
+        }
+
+        return 0;
+    }
+
+    private function stringValue(mixed $value): string
+    {
+        return is_scalar($value) ? (string) $value : '';
     }
 }

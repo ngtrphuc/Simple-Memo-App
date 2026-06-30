@@ -2,12 +2,42 @@
 
 declare(strict_types=1);
 
-require 'db.php';
-require 'lang.php';
-
 use App\Csrf;
 
-$action = $_GET['action'] ?? 'login';
+/**
+ * @return array{id: int, username: string, password: string}|null
+ */
+function findUserByUsername(PDO $db, string $username): ?array
+{
+    $stmt = $db->prepare('SELECT id, username, password FROM users WHERE username = ?');
+    $stmt->execute([$username]);
+    $row = $stmt->fetch();
+
+    if (! is_array($row)) {
+        return null;
+    }
+
+    $id = $row['id'] ?? null;
+    $storedUsername = $row['username'] ?? null;
+    $storedPassword = $row['password'] ?? null;
+
+    if (! is_numeric($id) || ! is_string($storedUsername) || ! is_string($storedPassword)) {
+        return null;
+    }
+
+    return [
+        'id' => (int) $id,
+        'username' => $storedUsername,
+        'password' => $storedPassword,
+    ];
+}
+
+require __DIR__.'/db.php';
+$db = memoAppDatabase();
+require __DIR__.'/lang.php';
+
+$actionParam = $_GET['action'] ?? null;
+$action = is_string($actionParam) ? $actionParam : 'login';
 $oldUsername = '';
 
 if ($action === 'logout') {
@@ -15,7 +45,11 @@ if ($action === 'logout') {
 
     if (ini_get('session.use_cookies')) {
         $params = session_get_cookie_params();
-        setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+        $sessionName = session_name();
+
+        if ($sessionName !== false) {
+            setcookie($sessionName, '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+        }
     }
 
     session_destroy();
@@ -33,8 +67,10 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Csrf::check();
 
-    $username = trim((string) ($_POST['username'] ?? ''));
-    $password = (string) ($_POST['password'] ?? '');
+    $usernameValue = $_POST['username'] ?? null;
+    $passwordValue = $_POST['password'] ?? null;
+    $username = is_string($usernameValue) ? trim($usernameValue) : '';
+    $password = is_string($passwordValue) ? $passwordValue : '';
     $oldUsername = $username;
 
     if ($username === '' || $password === '') {
@@ -42,30 +78,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (! preg_match('/^[a-zA-Z0-9_]{3,32}$/', $username)) {
         $error = t('err_invalid_username');
     } elseif ($action === 'register') {
-        $stmt = $db->prepare('SELECT id FROM users WHERE username = ?');
-        $stmt->execute([$username]);
-
-        if ($stmt->fetch()) {
+        if (findUserByUsername($db, $username) !== null) {
             $error = t('err_user_exists');
         } else {
             $hash = password_hash($password, PASSWORD_DEFAULT);
             $stmt = $db->prepare('INSERT INTO users (username, password) VALUES (?, ?)');
             $stmt->execute([$username, $hash]);
             session_regenerate_id(true);
-            $_SESSION['user_id'] = $db->lastInsertId();
+            $_SESSION['user_id'] = (int) $db->lastInsertId();
             $_SESSION['username'] = $username;
             header('Location: index.php');
             exit;
         }
     } else {
-        $stmt = $db->prepare('SELECT * FROM users WHERE username = ?');
-        $stmt->execute([$username]);
-        $user = $stmt->fetch();
-        $storedPassword = $user['password'] ?? '';
-        $isHash = $storedPassword && password_get_info($storedPassword)['algo'];
+        $user = findUserByUsername($db, $username);
         $ok = false;
 
-        if ($user) {
+        if ($user !== null) {
+            $storedPassword = $user['password'];
+            $passwordInfo = password_get_info($storedPassword);
+            $isHash = $passwordInfo['algo'] !== null;
+
             if ($isHash) {
                 $ok = password_verify($password, $storedPassword);
             } else {
@@ -79,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        if ($ok) {
+        if ($ok && $user !== null) {
             session_regenerate_id(true);
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $user['username'];

@@ -289,20 +289,53 @@ $translations = [
 
 $T = $translations[$lang];
 
+/**
+ * @return array<string, array<string, string>>
+ */
+function allTranslations(): array
+{
+    global $translations;
+
+    if (! is_array($translations)) {
+        return [];
+    }
+
+    $result = [];
+
+    foreach ($translations as $language => $entries) {
+        if (! is_string($language) || ! is_array($entries)) {
+            continue;
+        }
+
+        $normalizedEntries = [];
+        foreach ($entries as $key => $value) {
+            if (! is_string($key) || ! is_string($value)) {
+                continue;
+            }
+
+            $normalizedEntries[$key] = $value;
+        }
+
+        $result[$language] = $normalizedEntries;
+    }
+
+    return $result;
+}
+
 function t(string $key): string
 {
-    global $T;
-    global $translations;
-    global $lang;
+    $translations = allTranslations();
+    $lang = currentLang();
+    $activeTranslations = $translations[$lang] ?? $translations['en'] ?? [];
 
-    return $T[$key] ?? $translations[$lang][$key] ?? $translations['en'][$key] ?? $key;
+    return $activeTranslations[$key] ?? $translations['en'][$key] ?? $key;
 }
 
 function currentLang(): string
 {
     global $lang;
 
-    return $lang;
+    return is_string($lang) ? $lang : 'en';
 }
 
 function langSelect(): string

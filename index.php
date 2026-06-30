@@ -2,20 +2,60 @@
 
 declare(strict_types=1);
 
-require 'db.php';
-require 'lang.php';
-
 use App\Csrf;
 use App\MemoRepository;
 use App\Reminder;
 use App\RepeatLabel;
+
+require __DIR__.'/db.php';
+$db = memoAppDatabase();
+require __DIR__.'/lang.php';
+
+function requestStringValue(mixed $value): string
+{
+    return is_string($value) ? trim($value) : '';
+}
+
+function requestIntValue(mixed $value): int
+{
+    if (is_int($value)) {
+        return $value;
+    }
+
+    if (is_string($value) && is_numeric($value)) {
+        return (int) $value;
+    }
+
+    return 0;
+}
+
+/**
+ * @return array<int, mixed>
+ */
+function requestArrayValue(mixed $value): array
+{
+    return is_array($value) ? array_values($value) : [];
+}
+
+function scalarStringValue(mixed $value, string $default = ''): string
+{
+    return is_scalar($value) ? (string) $value : $default;
+}
 
 if (! isset($_SESSION['user_id'])) {
     header('Location: auth.php');
     exit;
 }
 
-$userId = (int) $_SESSION['user_id'];
+$userId = requestIntValue($_SESSION['user_id']);
+
+if ($userId <= 0) {
+    header('Location: auth.php');
+    exit;
+}
+
+$sessionUsername = $_SESSION['username'] ?? '';
+$sessionUsername = is_string($sessionUsername) ? $sessionUsername : '';
 $memos = new MemoRepository($db);
 
 // Translator passed to label helpers so domain code stays decoupled from i18n.
@@ -30,17 +70,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Csrf::check();
 
     $action = $_POST['action'] ?? '';
-    $title = trim((string) ($_POST['title'] ?? ''));
-    $content = trim((string) ($_POST['content'] ?? ''));
-    $remind = Reminder::formatReminderForInput(trim((string) ($_POST['remind_at'] ?? '')));
+    $action = is_string($action) ? $action : '';
+    $title = requestStringValue($_POST['title'] ?? null);
+    $content = requestStringValue($_POST['content'] ?? null);
+    $remind = Reminder::formatReminderForInput(requestStringValue($_POST['remind_at'] ?? null));
 
     $repeatPattern = Reminder::normalizeRepeatPattern(
-        (string) ($_POST['repeat_mode'] ?? 'none'),
+        requestStringValue($_POST['repeat_mode'] ?? 'none'),
         [
             'interval_value' => $_POST['repeat_interval_value'] ?? 1,
             'interval_unit' => $_POST['repeat_interval_unit'] ?? 'hour',
-            'repeat_weekdays' => $_POST['repeat_weekdays'] ?? [],
-            'repeat_monthdays' => $_POST['repeat_monthdays'] ?? [],
+            'repeat_weekdays' => requestArrayValue($_POST['repeat_weekdays'] ?? []),
+            'repeat_monthdays' => requestArrayValue($_POST['repeat_monthdays'] ?? []),
         ],
         $remind
     );
@@ -50,17 +91,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'reschedule') {
         header('Content-Type: application/json');
 
-        $memo = $memos->find((int) ($_POST['id'] ?? 0), $userId);
+        $memo = $memos->find(requestIntValue($_POST['id'] ?? 0), $userId);
 
         if ($memo === null) {
             echo json_encode(['success' => false]);
             exit;
         }
 
-        $currentRemindAt = Reminder::formatReminderForInput($memo['remind_at'] ?? '');
+        $currentRemindAt = Reminder::formatReminderForInput($memo['remind_at']);
         $storedPattern = Reminder::normalizeStoredRepeatPattern(
-            (string) ($memo['repeat_mode'] ?? 'none'),
-            $memo['repeat_config'] ?? '',
+            $memo['repeat_mode'],
+            $memo['repeat_config'],
             $currentRemindAt
         );
         $currentRepeatMode = $storedPattern['mode'];
@@ -91,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        $memos->updateRemindAt((int) ($_POST['id'] ?? 0), $userId, $nextRemindAt);
+        $memos->updateRemindAt(requestIntValue($_POST['id'] ?? 0), $userId, $nextRemindAt);
 
         echo json_encode([
             'success' => true,
@@ -107,11 +148,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'edit' && $title !== '') {
-        $memos->update((int) ($_POST['id'] ?? 0), $userId, $title, $content, $remind, $repeatMode, $repeatConfig);
+        $memos->update(requestIntValue($_POST['id'] ?? 0), $userId, $title, $content, $remind, $repeatMode, $repeatConfig);
     }
 
     if ($action === 'delete') {
-        $memos->delete((int) ($_POST['id'] ?? 0), $userId);
+        $memos->delete(requestIntValue($_POST['id'] ?? 0), $userId);
     }
 
     header('Location: index.php');
@@ -122,14 +163,14 @@ $memoList = $memos->allForUser($userId);
 
 $edit = null;
 if (isset($_GET['edit'])) {
-    $edit = $memos->find((int) $_GET['edit'], $userId);
+    $edit = $memos->find(requestIntValue($_GET['edit']), $userId);
 }
 
 $editPattern = $edit !== null
-    ? Reminder::normalizeStoredRepeatPattern((string) ($edit['repeat_mode'] ?? 'none'), $edit['repeat_config'] ?? '', $edit['remind_at'] ?? '')
+    ? Reminder::normalizeStoredRepeatPattern($edit['repeat_mode'], $edit['repeat_config'], $edit['remind_at'])
     : ['mode' => 'none', 'config' => []];
-$editIntervalValue = (int) ($editPattern['config']['value'] ?? 1);
-$editIntervalUnit = Reminder::normalizeIntervalUnit((string) ($editPattern['config']['unit'] ?? 'hour'));
+$editIntervalValue = requestIntValue($editPattern['config']['value'] ?? 1);
+$editIntervalUnit = Reminder::normalizeIntervalUnit(scalarStringValue($editPattern['config']['unit'] ?? 'hour', 'hour'));
 $editWeekdays = Reminder::normalizeNumericSelection($editPattern['config']['weekdays'] ?? [], 0, 6);
 $editMonthdays = Reminder::normalizeNumericSelection($editPattern['config']['monthdays'] ?? [], 1, 31);
 $memoCount = count($memoList);
@@ -137,13 +178,13 @@ $scheduledCount = 0;
 $recurringCount = 0;
 
 foreach ($memoList as $memo) {
-    $hasReminder = Reminder::formatReminderForInput($memo['remind_at'] ?? '') !== '';
+    $hasReminder = Reminder::formatReminderForInput($memo['remind_at']) !== '';
 
     if ($hasReminder) {
         $scheduledCount++;
     }
 
-    if (($memo['repeat_mode'] ?? 'none') !== 'none') {
+    if ($memo['repeat_mode'] !== 'none') {
         $recurringCount++;
     }
 }
@@ -168,7 +209,7 @@ foreach ($memoList as $memo) {
         <div class="header-tools">
             <div class="user-chip">
                 <?php echo htmlspecialchars(t('hello')); ?>,
-                <strong><?php echo htmlspecialchars((string) $_SESSION['username']); ?></strong>
+                <strong><?php echo htmlspecialchars($sessionUsername); ?></strong>
             </div>
             <?php echo langSelect(); ?>
             <a class="btn btn-ghost btn-small" href="auth.php?action=logout"><?php echo htmlspecialchars(t('logout')); ?></a>
@@ -361,16 +402,16 @@ foreach ($memoList as $memo) {
                     <div class="memo-grid">
                         <?php foreach ($memoList as $memo) { ?>
                             <?php
-                            $memoRemindAt = Reminder::formatReminderForInput($memo['remind_at'] ?? '');
-                            $memoPattern = Reminder::normalizeStoredRepeatPattern((string) ($memo['repeat_mode'] ?? 'none'), $memo['repeat_config'] ?? '', $memoRemindAt);
+                            $memoRemindAt = Reminder::formatReminderForInput($memo['remind_at']);
+                            $memoPattern = Reminder::normalizeStoredRepeatPattern($memo['repeat_mode'], $memo['repeat_config'], $memoRemindAt);
                             $memoRepeatMode = $memoPattern['mode'];
                             $memoRepeatLabel = RepeatLabel::describe($tr, $memoRepeatMode, $memoPattern['config']);
-                            $memoContent = trim((string) ($memo['content'] ?? ''));
+                            $memoContent = trim($memo['content']);
                             ?>
                             <article class="memo-card">
                                 <div class="memo-card__head">
                                     <div>
-                                        <h3><?php echo htmlspecialchars((string) $memo['title']); ?></h3>
+                                        <h3><?php echo htmlspecialchars($memo['title']); ?></h3>
                                         <p class="memo-card__body<?php echo $memoContent === '' ? ' memo-card__body--muted' : ''; ?>">
                                             <?php echo $memoContent === '' ? htmlspecialchars(t('empty_content')) : nl2br(htmlspecialchars($memoContent)); ?>
                                         </p>
@@ -381,11 +422,11 @@ foreach ($memoList as $memo) {
                                     <?php if ($memoRemindAt !== '') { ?>
                                         <span
                                             class="meta-pill reminder-pill"
-                                            data-id="<?php echo (int) $memo['id']; ?>"
+                                            data-id="<?php echo $memo['id']; ?>"
                                             data-remind="<?php echo htmlspecialchars($memoRemindAt); ?>"
                                             data-repeat-mode="<?php echo htmlspecialchars($memoRepeatMode); ?>"
                                             data-repeat-label="<?php echo htmlspecialchars($memoRepeatLabel); ?>"
-                                            data-title="<?php echo htmlspecialchars((string) $memo['title']); ?>"
+                                            data-title="<?php echo htmlspecialchars($memo['title']); ?>"
                                         >
                                             <?php echo htmlspecialchars(RepeatLabel::summaryText($tr, $memoRemindAt, $memoRepeatLabel)); ?>
                                         </span>
@@ -394,16 +435,16 @@ foreach ($memoList as $memo) {
                                         </span>
                                     <?php } ?>
 
-                                    <span class="meta-date"><?php echo htmlspecialchars((string) $memo['created_at']); ?></span>
+                                    <span class="meta-date"><?php echo htmlspecialchars($memo['created_at']); ?></span>
                                 </div>
 
                                 <div class="memo-actions">
-                                    <a class="btn btn-ghost btn-small" href="index.php?edit=<?php echo (int) $memo['id']; ?>"><?php echo htmlspecialchars(t('edit')); ?></a>
+                                    <a class="btn btn-ghost btn-small" href="index.php?edit=<?php echo $memo['id']; ?>"><?php echo htmlspecialchars(t('edit')); ?></a>
 
                                     <form class="inline-form" method="post">
                                         <?php echo Csrf::field(); ?>
                                         <input type="hidden" name="action" value="delete">
-                                        <input type="hidden" name="id" value="<?php echo (int) $memo['id']; ?>">
+                                        <input type="hidden" name="id" value="<?php echo $memo['id']; ?>">
                                         <button
                                             type="button"
                                             class="btn btn-danger btn-small"

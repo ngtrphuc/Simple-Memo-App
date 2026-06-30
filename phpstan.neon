@@ -1,6 +1,10 @@
 parameters:
     level: max
     paths:
+        - auth.php
+        - db.php
+        - index.php
+        - lang.php
         - src
         - tests
     tmpDir: .phpstan-cache
