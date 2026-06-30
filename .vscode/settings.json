@@ -1,0 +1,6 @@
+{
+    "php.validate.executablePath": "E:\\Code\\PHP\\php-8.5.7\\php.exe",
+    "php.executablePath": "E:\\Code\\PHP\\php-8.5.7\\php.exe",
+    "intelephense.environment.phpVersion": "8.5.0",
+    "devsense.phptools-vscode.phpVersion": "8.5"
+}
