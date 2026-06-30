@@ -52,7 +52,7 @@ npm start
 
 ```bash
 composer test         # PHPUnit
-composer analyse      # PHPStan (level max)
+composer analyse      # PHPStan (level max, including root entrypoints)
 composer pint:test    # code style check (PSR-12)
 composer pint         # apply code style fixes
 composer rector:dry   # preview automated refactors
@@ -60,6 +60,9 @@ composer rector       # apply automated refactors
 composer audit        # dependency audit
 composer check        # pint:test + analyse + test + audit
 ```
+
+The dev toolchain stays framework-free. Unused Laravel-only debug tooling has been removed
+from `require-dev`, and `_quarantine/phpstan.larastan.neon` remains unreferenced.
 
 ## Project Structure
 

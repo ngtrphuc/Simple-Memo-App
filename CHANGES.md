@@ -4,6 +4,22 @@ This refactor extracts domain logic into a tested `src/` layer, adds CSRF protec
 and session hardening, and wires up a generic quality toolchain (PHPUnit, PHPStan at
 max level, Pint, Rector). No framework was introduced; the app stays plain PHP + PDO + SQLite.
 
+## 2026-06-30 Maintenance pass
+
+- Removed unused `barryvdh/laravel-debugbar` from `require-dev`, which also dropped the
+  leftover Laravel/Symfony transitive tree from `composer.lock`.
+- Expanded `phpstan.neon` coverage to include `auth.php`, `db.php`, `index.php`, and
+  `lang.php` instead of only `src/` and `tests/`.
+- Tightened the plain-PHP bootstrap and entrypoints so the new PHPStan coverage passes
+  without baselines or suppressions:
+  - `db.php` now exposes a typed `memoAppDatabase()` bootstrap, guards directory creation,
+    and handles schema introspection safely.
+  - `auth.php` and `index.php` now normalize request/session data before use.
+  - `src/MemoRepository.php` now hydrates memo rows to a stable typed shape.
+  - `lang.php` now normalizes translation access for predictable string returns.
+- Removed remaining user-facing English fallback literals from `memo-ui.js`; runtime UI
+  copy now comes from `window.memoAppConfig.text`.
+
 ## New files
 
 ### `src/Reminder.php`
