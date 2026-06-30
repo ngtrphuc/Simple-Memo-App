@@ -91,7 +91,7 @@ final readonly class MemoRepository
             $remindAt,
             $repeatMode,
             $repeatConfig,
-            (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
+            new DateTimeImmutable('now')->format('Y-m-d H:i:s'),
         ]);
     }
 
