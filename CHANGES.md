@@ -20,6 +20,22 @@ max level, Pint, Rector). No framework was introduced; the app stays plain PHP +
 - Removed remaining user-facing English fallback literals from `memo-ui.js`; runtime UI
   copy now comes from `window.memoAppConfig.text`.
 
+## 2026-06-30 Latest-version bump
+
+- Raised the runtime constraint from PHP `^8.3` to `^8.5`.
+- Updated direct dev tools to the latest stable versions verified for this pass:
+  - `phpunit/phpunit` `11.5.55` -> `13.2.1`
+  - `phpstan/phpstan` `2.2.2` -> kept at latest stable
+  - `rector/rector` `2.5.2` -> kept at latest stable
+  - `laravel/pint` `1.29.3` -> kept at latest stable
+  - `electron` `42.5.0` -> `42.5.1`
+- Added `failOnDeprecation="true"` to `phpunit.xml` so deprecations break CI early on
+  the newer toolchain.
+- Applied the only PHP-8.5-driven Rector change in app code: dropped unnecessary
+  parentheses from a local `new DateTimeImmutable(...)` call in `src/MemoRepository.php`.
+- Verified the updated stack with PHPUnit 13, PHPStan 2.2, Pint 1.29, Rector 2.5,
+  `composer audit`, `npm audit`, the live web smoke test, and an Electron startup check.
+
 ## New files
 
 ### `src/Reminder.php`

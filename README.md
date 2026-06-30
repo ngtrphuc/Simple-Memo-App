@@ -15,9 +15,9 @@ optional Electron wrapper for running it like a desktop app.
 
 ## Stack
 
-- PHP 8.3 (PDO + SQLite)
+- PHP 8.5 (PDO + SQLite)
 - Vanilla JS frontend
-- Electron (optional desktop wrapper)
+- Electron 42.5.1 (optional desktop wrapper)
 
 ## Getting Started
 
@@ -51,11 +51,11 @@ npm start
 ## Code Quality
 
 ```bash
-composer test         # PHPUnit
-composer analyse      # PHPStan (level max, including root entrypoints)
-composer pint:test    # code style check (PSR-12)
+composer test         # PHPUnit 13
+composer analyse      # PHPStan 2.2 (level max, including root entrypoints)
+composer pint:test    # Pint 1.29 style check (PSR-12)
 composer pint         # apply code style fixes
-composer rector:dry   # preview automated refactors
+composer rector:dry   # Rector 2.5 preview of automated refactors
 composer rector       # apply automated refactors
 composer audit        # dependency audit
 composer check        # pint:test + analyse + test + audit
@@ -63,6 +63,9 @@ composer check        # pint:test + analyse + test + audit
 
 The dev toolchain stays framework-free. Unused Laravel-only debug tooling has been removed
 from `require-dev`, and `_quarantine/phpstan.larastan.neon` remains unreferenced.
+
+The workspace now targets PHP 8.5 end-to-end, including the committed VS Code workspace
+settings in `.vscode/settings.json`.
 
 ## Project Structure
 
